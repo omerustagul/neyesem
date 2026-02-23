@@ -9,7 +9,7 @@ import { colors } from '../../theme/colors';
 export const AppearanceScreen = ({ navigation }: any) => {
     const { theme, typography, themeMode, setThemeMode } = useTheme();
     const insets = useSafeAreaInsets();
-    const headerHeight = 64 + insets.top;
+    const headerHeight = 52 + insets.top;
 
     const ThemeOption = ({ mode, label, icon: Icon }: { mode: ThemeMode, label: string, icon: any }) => {
         const isActive = themeMode === mode;
@@ -95,10 +95,7 @@ const styles = StyleSheet.create({
         width: '100%',
         marginBottom: 12,
     },
-    optionCard: {
-        paddingVertical: 18,
-        paddingHorizontal: 16,
-    },
+    optionCard: {},
     optionContent: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -112,9 +109,7 @@ const styles = StyleSheet.create({
     optionLabel: {
         fontSize: 16,
     },
-    infoCard: {
-        padding: 16,
-    },
+    infoCard: {},
     infoText: {
         fontSize: 13,
         lineHeight: 20,

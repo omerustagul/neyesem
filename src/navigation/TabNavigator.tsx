@@ -1,13 +1,12 @@
 ﻿import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
-import { StyleSheet } from 'react-native';
-import { CreateScreen } from '../screens/create/CreateScreen';
+import { StyleSheet, View } from 'react-native';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
 import { FeedScreen } from '../screens/feed/FeedScreen';
 import { ListsScreen } from '../screens/lists/ListsScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
-import { FloatingTabBar } from './FloatingTabBar';
 import { useTheme } from '../theme/ThemeProvider';
+import { FloatingTabBar } from './FloatingTabBar';
 
 const Tab = createBottomTabNavigator();
 
@@ -19,12 +18,20 @@ export const TabNavigator = () => {
             tabBar={(props) => <FloatingTabBar {...props} />}
             screenOptions={{
                 headerShown: false,
-                contentStyle: { backgroundColor: theme.background },
             }}
         >
             <Tab.Screen name="Feed" component={FeedScreen} />
             <Tab.Screen name="Explore" component={ExploreScreen} />
-            <Tab.Screen name="Create" component={CreateScreen} />
+            <Tab.Screen
+                name="CreatePlaceholder"
+                component={View}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        e.preventDefault();
+                        navigation.navigate('Create');
+                    },
+                })}
+            />
             <Tab.Screen name="Lists" component={ListsScreen} />
             <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>

@@ -1,8 +1,9 @@
+import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { Camera, User as UserIcon } from 'lucide-react-native';
+import { Camera, Settings, User as UserIcon } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { AnimatedLevelCard } from '../../components/level/AnimatedLevelCard';
@@ -12,13 +13,14 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
 export const ProfileScreen = () => {
-    const { theme, typography } = useTheme();
+    const { theme, isDark, typography } = useTheme();
     const { user } = useAuthStore();
+    const navigation = useNavigation<any>();
     const { level, xp, xpNextLevel, levelName, updateStats } = useLevelStore();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const insets = useSafeAreaInsets();
-    const headerHeight = 64 + insets.top;
+    const headerHeight = 52 + insets.top;
 
     useEffect(() => {
         if (!user) return;
@@ -64,6 +66,15 @@ export const ProfileScreen = () => {
         }
     };
 
+    const handleSettingsPress = () => {
+        const parentNav = navigation.getParent();
+        if (parentNav) {
+            parentNav.navigate('Settings');
+            return;
+        }
+        navigation.navigate('Settings');
+    };
+
     const posts = profile?.post_count || 0;
     const followers = profile?.followers_count || 0;
     const following = profile?.following_count || 0;
@@ -71,24 +82,44 @@ export const ProfileScreen = () => {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <ScrollView
-                contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 26 }]}
-                scrollIndicatorInsets={{ right: 1 }}
+                contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 16 }]}
                 showsVerticalScrollIndicator={false}
-                bounces={false}
+                bounces={true}
+                alwaysBounceVertical={Platform.OS === 'ios'}
             >
+                {/* Settings Button Row */}
+                <View style={styles.topRow}>
+                    <View style={styles.topRowSpacer} />
+                    <TouchableOpacity
+                        style={[styles.settingsButton, {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                            borderColor: theme.border,
+                        }]}
+                        onPress={handleSettingsPress}
+                        activeOpacity={0.7}
+                    >
+                        <Settings size={20} color={theme.text} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Avatar */}
                 <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage} activeOpacity={0.8}>
                     {profile?.avatar_url ? (
                         <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
                     ) : (
-                        <View style={[styles.avatarFallback, { borderColor: theme.border }]}>
-                            <UserIcon color={colors.oliveMuted} size={54} />
+                        <View style={[styles.avatarFallback, {
+                            borderColor: theme.border,
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F0F4F1',
+                        }]}>
+                            <UserIcon color={colors.oliveMuted} size={36} />
                         </View>
                     )}
-                    <View style={styles.cameraBadge}>
-                        <Camera color={colors.warmWhite} size={14} />
+                    <View style={[styles.cameraBadge, { borderColor: theme.background }]}>
+                        <Camera color={colors.warmWhite} size={11} />
                     </View>
                 </TouchableOpacity>
 
+                {/* Name */}
                 <Text style={[styles.displayName, { color: theme.text, fontFamily: typography.display }]}>
                     {loading ? '...' : (profile?.display_name || 'Kullanıcı')}
                 </Text>
@@ -96,33 +127,73 @@ export const ProfileScreen = () => {
                     {loading ? '...' : `@${profile?.username || 'kullanici'}`}
                 </Text>
 
+                {/* Stats */}
                 <View style={[styles.statsRow, { borderColor: theme.border }]}>
                     <View style={styles.statItem}>
-                        <Text style={[styles.statValue, { color: theme.text }]}>{posts}</Text>
-                        <Text style={[styles.statLabel, { color: theme.secondaryText }]}>GÖNDERİ</Text>
+                        <Text style={[styles.statValue, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                            {posts}
+                        </Text>
+                        <Text style={[styles.statLabel, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                            Gönderi
+                        </Text>
                     </View>
-                    <View style={[styles.statSeparator, { backgroundColor: theme.border }]} />
                     <View style={styles.statItem}>
-                        <Text style={[styles.statValue, { color: theme.text }]}>{followers}</Text>
-                        <Text style={[styles.statLabel, { color: theme.secondaryText }]}>TAKİPÇİ</Text>
+                        <Text style={[styles.statValue, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                            {followers}
+                        </Text>
+                        <Text style={[styles.statLabel, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                            Takipçi
+                        </Text>
                     </View>
-                    <View style={[styles.statSeparator, { backgroundColor: theme.border }]} />
                     <View style={styles.statItem}>
-                        <Text style={[styles.statValue, { color: theme.text }]}>{following}</Text>
-                        <Text style={[styles.statLabel, { color: theme.secondaryText }]}>TAKİP</Text>
+                        <Text style={[styles.statValue, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                            {following}
+                        </Text>
+                        <Text style={[styles.statLabel, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                            Takip
+                        </Text>
                     </View>
                 </View>
 
+                {/* Bio */}
+                <Text style={[styles.bio, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                    {profile?.bio || 'Henüz biyografi eklenmedi.'}
+                </Text>
+
+                {/* Level Card */}
                 <AnimatedLevelCard
                     level={level}
                     xp={xp}
                     xpNext={xpNextLevel}
                     levelName={levelName}
+                    streak={profile?.streak || 0}
+                    weeklyXp={profile?.weekly_xp || 0}
                 />
 
-                <Text style={[styles.bio, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                    {profile?.bio || 'Daha fazla tarif paylaş, seviye atla.'}
-                </Text>
+                {/* Empty State / Posts Section */}
+                <View style={styles.postsSection}>
+                    <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.display }]}>
+                        Gönderiler
+                    </Text>
+
+                    {posts === 0 ? (
+                        <View style={[styles.emptyState, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
+                            <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
+                                <UserIcon size={32} color={theme.secondaryText} />
+                            </View>
+                            <Text style={[styles.emptyTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                Henüz gönderi yok
+                            </Text>
+                            <Text style={[styles.emptySubtitle, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                                İlk tarifini paylaşmak için 'Oluştur' butonuna tıkla!
+                            </Text>
+                        </View>
+                    ) : (
+                        <View style={styles.postsGrid}>
+                            {/* Posts would go here */}
+                        </View>
+                    )}
+                </View>
             </ScrollView>
         </View>
     );
@@ -133,60 +204,75 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        alignItems: 'center',
-        paddingHorizontal: 22,
-        paddingBottom: 120,
+        paddingHorizontal: 16,
+        paddingBottom: 100,
     },
-    avatarContainer: {
-        width: 142,
-        height: 142,
-        borderRadius: 71,
-        marginBottom: 18,
+    topRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    topRowSpacer: {
+        flex: 1,
+    },
+    settingsButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    avatarContainer: {
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+        marginBottom: 12,
+        alignSelf: 'center',
         position: 'relative',
     },
     avatarImage: {
         width: '100%',
         height: '100%',
-        borderRadius: 71,
+        borderRadius: 44,
     },
     avatarFallback: {
         width: '100%',
         height: '100%',
-        borderRadius: 71,
+        borderRadius: 44,
         borderWidth: 1,
-        backgroundColor: '#EBEEEA',
         alignItems: 'center',
         justifyContent: 'center',
     },
     cameraBadge: {
         position: 'absolute',
-        right: 4,
-        bottom: 4,
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        right: 0,
+        bottom: 0,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
         backgroundColor: colors.saffron,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 2,
     },
     displayName: {
-        fontSize: 44,
+        fontSize: 22,
         textAlign: 'center',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     username: {
-        fontSize: 24,
-        marginBottom: 22,
+        fontSize: 14,
+        textAlign: 'center',
+        marginBottom: 16,
     },
     statsRow: {
-        width: '100%',
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'space-around',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        marginBottom: 18,
+        paddingVertical: 10,
+        marginBottom: 10,
     },
     statItem: {
         flex: 1,
@@ -194,22 +280,54 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     statValue: {
-        fontSize: 34,
-        fontWeight: '700',
-        marginBottom: 4,
+        fontSize: 18,
+        marginBottom: 2,
     },
     statLabel: {
-        fontSize: 13,
-        fontWeight: '600',
+        fontSize: 12,
     },
     statSeparator: {
-        width: 1,
-        height: 42,
+        width: 0.5,
+        height: 28,
     },
     bio: {
-        width: '100%',
-        fontSize: 16,
+        fontSize: 14,
+        lineHeight: 20,
         textAlign: 'center',
-        marginTop: 14,
+        marginBottom: 16,
+    },
+    postsSection: {
+        marginTop: 10,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        marginBottom: 16,
+    },
+    emptyState: {
+        borderRadius: 20,
+        padding: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyIconCircle: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    emptyTitle: {
+        fontSize: 16,
+        marginBottom: 4,
+    },
+    emptySubtitle: {
+        fontSize: 13,
+        textAlign: 'center',
+        opacity: 0.7,
+    },
+    postsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
     },
 });

@@ -1,4 +1,4 @@
-import { useNavigation } from '@react-navigation/native';
+import { getFocusedRouteNameFromRoute, useNavigation, useNavigationState } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { Bell, ChevronLeft } from 'lucide-react-native';
 import React from 'react';
@@ -7,6 +7,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
+
+// Screens that have their own custom header — GlobalHeader hides itself
+const HIDDEN_ON_SCREENS = ['Settings', 'Create', 'EditProfile', 'CreatePlaceholder'];
+
+const ROUTE_TITLES: Record<string, string> = {
+    'Notifications': 'Bildirimler',
+    'Appearance': 'Görünüm',
+    'EditProfile': 'Profili Düzenle',
+    'Explore': 'Keşfet',
+    'Lists': 'Listelerim',
+    'Profile': 'Profil',
+};
+
+// Helper to find the active route name in nested navigators
+const getActiveRouteName = (route: any): string => {
+    const focusedRouteName = getFocusedRouteNameFromRoute(route);
+    return focusedRouteName || route.name;
+};
 
 interface GlobalHeaderProps {
     showBack?: boolean;
@@ -18,6 +36,19 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
     const navigation = useNavigation<any>();
     const insets = useSafeAreaInsets();
     const { unreadCount } = useNotificationStore();
+
+    // Determine current route name from the root navigator state
+    const currentRouteName = useNavigationState((state) => {
+        const route = state.routes[state.index];
+        return getActiveRouteName(route);
+    });
+
+    // Hide header on screens with custom headers
+    if (HIDDEN_ON_SCREENS.includes(currentRouteName)) {
+        return null;
+    }
+
+    const displayTitle = title || ROUTE_TITLES[currentRouteName];
 
     const logo = isDark
         ? require('../../../assets/images/appicon-dark_theme.webp')
@@ -38,10 +69,18 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
     };
 
     return (
-        <View style={[styles.outerContainer, { paddingTop: insets.top }]}>
-            <View style={[styles.container, { borderColor: theme.border, backgroundColor: theme.glass }]}>
+        <View style={styles.outerContainer}>
+            {/* Single glass container that spans from top of screen to bottom of header */}
+            <View style={[
+                styles.glassContainer,
+                {
+                    paddingTop: insets.top,
+                    borderColor: theme.border,
+                    backgroundColor: theme.glass,
+                }
+            ]}>
                 <BlurView
-                    intensity={34}
+                    intensity={50}
                     tint={isDark ? 'dark' : 'light'}
                     style={StyleSheet.absoluteFillObject}
                 />
@@ -52,30 +91,28 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
                                 onPress={() => navigation.goBack()}
                                 style={[styles.iconButton, iconButtonStyle]}
                             >
-                                <ChevronLeft color={theme.text} size={26} />
+                                <ChevronLeft color={theme.text} size={24} />
                             </TouchableOpacity>
                         )}
                     </View>
 
-                    {title ? (
+                    {displayTitle ? (
                         <Text style={[styles.title, { color: theme.text, fontFamily: typography.display }]}>
-                            {title}
+                            {displayTitle}
                         </Text>
                     ) : (
                         <Image source={logo} style={styles.logo} resizeMode="contain" />
                     )}
 
                     <TouchableOpacity
-                        style={styles.side}
+                        style={styles.notificationButton}
                         onPress={handleNotificationPress}
                         activeOpacity={0.7}
                     >
-                        <View style={[styles.iconButton, iconButtonStyle]}>
-                            <Bell color={theme.text} size={23} />
-                            {unreadCount > 0 && (
-                                <View style={[styles.badge, { backgroundColor: colors.spiceRed }]} />
-                            )}
-                        </View>
+                        <Bell color={theme.text} size={24} />
+                        {unreadCount > 0 && (
+                            <View style={[styles.badge, { backgroundColor: colors.spiceRed, borderColor: theme.background }]} />
+                        )}
                     </TouchableOpacity>
                 </View>
             </View>
@@ -91,56 +128,55 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
     },
-    container: {
-        height: 64,
-        borderBottomWidth: 1,
+    glassContainer: {
+        borderBottomWidth: 0.5,
         overflow: 'hidden',
-        shadowColor: '#0A6C40',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
     },
     content: {
-        flex: 1,
+        height: 52,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 12,
+        paddingHorizontal: 16,
     },
     side: {
-        width: 44,
-        height: 44,
+        width: 40,
+        height: 40,
         alignItems: 'center',
         justifyContent: 'center',
     },
+    notificationButton: {
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+    },
     logo: {
-        height: 34,
-        width: 124,
+        height: 32,
+        width: 120,
     },
     title: {
-        fontSize: 22,
-        fontWeight: '700',
+        fontSize: 18,
+        fontWeight: '600',
     },
     iconButton: {
         position: 'relative',
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-        backgroundColor: 'rgba(255,255,255,0.12)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     badge: {
         position: 'absolute',
-        top: 8,
-        right: 7,
-        width: 10,
-        height: 10,
-        borderRadius: 5,
+        top: 6,
+        right: 6,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
         borderWidth: 2,
-        borderColor: colors.warmWhite,
+        borderColor: '#080e0b',
     },
 });

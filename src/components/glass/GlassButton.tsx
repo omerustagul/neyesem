@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
@@ -12,6 +12,8 @@ interface GlassButtonProps {
     textStyle?: TextStyle;
     variant?: 'primary' | 'secondary' | 'outline';
     icon?: React.ReactNode;
+    trailingIcon?: React.ReactNode;
+    loading?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -23,6 +25,8 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     textStyle,
     variant = 'primary',
     icon,
+    trailingIcon,
+    loading = false,
 }) => {
     const { theme, typography } = useTheme();
     const scale = useSharedValue(1);
@@ -65,19 +69,26 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
                 contentStyle={styles.content}
             >
                 <View style={styles.row}>
-                    {icon && icon}
-                    <Text
-                        style={[
-                            styles.text,
-                            {
-                                color: isPrimary ? colors.warmWhite : theme.text,
-                                fontFamily: typography.bodyMedium,
-                            },
-                            textStyle,
-                        ]}
-                    >
-                        {title}
-                    </Text>
+                    {loading ? (
+                        <ActivityIndicator color={isPrimary ? colors.warmWhite : theme.text} size="small" />
+                    ) : (
+                        <>
+                            {icon && <View style={styles.iconMargin}>{icon}</View>}
+                            <Text
+                                style={[
+                                    styles.text,
+                                    {
+                                        color: isPrimary ? colors.warmWhite : theme.text,
+                                        fontFamily: typography.bodyMedium,
+                                    },
+                                    textStyle,
+                                ]}
+                            >
+                                {title}
+                            </Text>
+                            {trailingIcon && <View style={styles.trailingIconMargin}>{trailingIcon}</View>}
+                        </>
+                    )}
                 </View>
             </GlassSurface>
         </AnimatedPressable>
@@ -103,5 +114,11 @@ const styles = StyleSheet.create({
     text: {
         fontSize: 16,
         fontWeight: '700',
+    },
+    iconMargin: {
+        marginRight: 8,
+    },
+    trailingIconMargin: {
+        marginLeft: 8,
     },
 });

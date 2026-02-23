@@ -1,6 +1,7 @@
-import { Bookmark, Lock, Plus, Sticker } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Bookmark, Lock, Plus, Star } from 'lucide-react-native';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '../../components/glass/GlassCard';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -17,29 +18,32 @@ const LISTS = [
         id: 'favorites',
         title: 'Favoriler',
         subtitle: '1 video',
-        icon: Sticker,
+        icon: Star,
         locked: true,
     },
 ];
 
 export const ListsScreen = () => {
-    const { theme, typography } = useTheme();
+    const { theme, isDark, typography } = useTheme();
     const insets = useSafeAreaInsets();
-    const headerHeight = 64 + insets.top;
+    const navigation = useNavigation<any>();
+    const headerHeight = 52 + insets.top;
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 16 }]}
                 showsVerticalScrollIndicator={false}
-                scrollIndicatorInsets={{ right: 1 }}
-                bounces={false}
+                bounces={true}
+                alwaysBounceVertical={Platform.OS === 'ios'}
             >
                 <View style={styles.headerRow}>
-                    <Text style={[styles.title, { color: theme.text, fontFamily: typography.display }]}>Listelerim</Text>
-                    <TouchableOpacity activeOpacity={0.8}>
+                    <Text style={[styles.title, { color: theme.text, fontFamily: typography.display }]}>
+                        Listelerim
+                    </Text>
+                    <TouchableOpacity activeOpacity={0.7}>
                         <View style={styles.addButton}>
-                            <Plus size={26} color={colors.warmWhite} />
+                            <Plus size={20} color={colors.warmWhite} />
                         </View>
                     </TouchableOpacity>
                 </View>
@@ -48,22 +52,28 @@ export const ListsScreen = () => {
                     {LISTS.map((list) => {
                         const Icon = list.icon;
                         return (
-                            <TouchableOpacity key={list.id} activeOpacity={0.8} style={styles.gridItem}>
+                            <TouchableOpacity key={list.id} activeOpacity={0.7} style={styles.gridItem}>
                                 <GlassCard style={styles.listCard}>
                                     <View style={styles.cardTopRow}>
-                                        <Icon size={34} color={colors.oliveLight} />
+                                        <View style={[styles.iconWrap, {
+                                            backgroundColor: isDark ? 'rgba(20,133,74,0.15)' : 'rgba(20,133,74,0.08)',
+                                        }]}>
+                                            <Icon size={22} color={colors.saffron} />
+                                        </View>
                                         {list.locked && (
-                                            <View style={styles.lockBadge}>
-                                                <Lock size={12} color={colors.oliveLight} />
+                                            <View style={[styles.lockBadge, { borderColor: theme.border }]}>
+                                                <Lock size={10} color={theme.secondaryText} />
                                             </View>
                                         )}
                                     </View>
-                                    <Text style={[styles.cardTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                        {list.title}
-                                    </Text>
-                                    <Text style={[styles.cardSubtitle, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                                        {list.subtitle}
-                                    </Text>
+                                    <View>
+                                        <Text style={[styles.cardTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                            {list.title}
+                                        </Text>
+                                        <Text style={[styles.cardSubtitle, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                                            {list.subtitle}
+                                        </Text>
+                                    </View>
                                 </GlassCard>
                             </TouchableOpacity>
                         );
@@ -79,42 +89,36 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 120,
+        paddingHorizontal: 16,
+        paddingBottom: 100,
     },
     headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 20,
+        marginBottom: 16,
     },
     title: {
-        fontSize: 40,
+        fontSize: 26,
     },
     addButton: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 38,
+        height: 38,
+        borderRadius: 12,
         backgroundColor: colors.saffron,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#0A6C40',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
     },
     grid: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        gap: 10,
     },
     gridItem: {
-        width: '48%',
+        flex: 1,
     },
     listCard: {
-        borderRadius: 16,
-        minHeight: 184,
-        padding: 14,
+        minHeight: 150,
         justifyContent: 'space-between',
     },
     cardTopRow: {
@@ -122,19 +126,26 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         justifyContent: 'space-between',
     },
+    iconWrap: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     lockBadge: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+        width: 24,
+        height: 24,
+        borderRadius: 8,
         borderWidth: 1,
-        borderColor: 'rgba(13,120,68,0.2)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     cardTitle: {
-        fontSize: 28,
+        fontSize: 15,
+        marginBottom: 2,
     },
     cardSubtitle: {
-        fontSize: 16,
+        fontSize: 12,
     },
 });

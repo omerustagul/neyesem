@@ -53,7 +53,7 @@ export const LevelUpSheet: React.FC<LevelUpSheetProps> = ({
                 </View>
 
                 <Text style={[styles.title, { color: colors.saffron, fontFamily: typography.display }]}>
-                    Seviye Atladın! 🎉
+                    Seviye Atladın!
                 </Text>
 
                 <Text style={[styles.levelName, { color: theme.text, fontFamily: typography.accent }]}>

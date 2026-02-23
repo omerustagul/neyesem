@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
+    Easing,
     useAnimatedStyle,
     useSharedValue,
-    withSpring
+    withRepeat,
+    withTiming,
 } from 'react-native-reanimated';
-import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
 interface XPBarProps {
@@ -14,29 +15,38 @@ interface XPBarProps {
 }
 
 export const XPBar: React.FC<XPBarProps> = ({ xp, xpNext }) => {
-    const { theme, typography } = useTheme();
     const progress = useSharedValue(0);
+    const shimmerX = useSharedValue(-1);
 
     useEffect(() => {
-        progress.value = withSpring(Math.min(xp / xpNext, 1));
+        // Fill animation from 0 to current
+        progress.value = withTiming(Math.min(xp / xpNext, 1), {
+            duration: 1200,
+            easing: Easing.out(Easing.cubic),
+        });
+        // Shimmer loop
+        shimmerX.value = withRepeat(
+            withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+            -1,
+            false
+        );
     }, [xp, xpNext]);
 
-    const animatedStyle = useAnimatedStyle(() => ({
+    const barStyle = useAnimatedStyle(() => ({
         width: `${progress.value * 100}%`,
+    }));
+
+    const shimmerStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: shimmerX.value * 200 }],
+        opacity: 0.35,
     }));
 
     return (
         <View style={styles.container}>
-            <View style={[styles.barBackground, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
-                <Animated.View style={[styles.barForeground, { backgroundColor: colors.saffron }, animatedStyle]} />
-            </View>
-            <View style={styles.labels}>
-                <Text style={[styles.xpText, { color: theme.secondaryText, fontFamily: typography.mono }]}>
-                    {xp} XP
-                </Text>
-                <Text style={[styles.xpText, { color: theme.secondaryText, fontFamily: typography.mono }]}>
-                    {xpNext} XP
-                </Text>
+            <View style={styles.barBackground}>
+                <Animated.View style={[styles.barForeground, barStyle]}>
+                    <Animated.View style={[styles.shimmer, shimmerStyle]} />
+                </Animated.View>
             </View>
         </View>
     );
@@ -45,24 +55,26 @@ export const XPBar: React.FC<XPBarProps> = ({ xp, xpNext }) => {
 const styles = StyleSheet.create({
     container: {
         width: '100%',
-        marginVertical: 10,
     },
     barBackground: {
         height: 8,
         borderRadius: 4,
         overflow: 'hidden',
         width: '100%',
+        backgroundColor: 'rgba(255,255,255,0.12)',
     },
     barForeground: {
         height: '100%',
         borderRadius: 4,
+        backgroundColor: colors.saffron,
+        overflow: 'hidden',
     },
-    labels: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 4,
-    },
-    xpText: {
-        fontSize: 10,
+    shimmer: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        width: 60,
+        backgroundColor: 'rgba(255,255,255,0.6)',
+        borderRadius: 4,
     },
 });

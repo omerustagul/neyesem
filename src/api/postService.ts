@@ -1,21 +1,20 @@
 ﻿import {
     addDoc,
+    arrayRemove,
+    arrayUnion,
     collection,
     deleteDoc,
     doc,
     getDoc,
     getDocs,
     increment,
+    limit,
+    onSnapshot,
     orderBy,
     query,
     serverTimestamp,
     updateDoc,
-    arrayUnion,
-    arrayRemove,
-    limit,
-    where,
-    QueryConstraint,
-    onSnapshot,
+    where
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -34,6 +33,10 @@ export interface Post {
     liked_by: string[];
     created_at: any;
     updated_at: any;
+    cooking_time?: string;
+    difficulty?: string;
+    calories?: number;
+    protein?: string;
 }
 
 // Create post
@@ -44,7 +47,11 @@ export const createPost = async (
     avatar_url: string,
     caption: string,
     content_type: 'text' | 'image' | 'video' | 'embed',
-    content_url?: string
+    content_url?: string,
+    cooking_time?: string,
+    difficulty?: string,
+    calories?: number,
+    protein?: string
 ): Promise<string> => {
     try {
         const postData = {
@@ -61,6 +68,10 @@ export const createPost = async (
             liked_by: [],
             created_at: serverTimestamp(),
             updated_at: serverTimestamp(),
+            cooking_time: cooking_time || null,
+            difficulty: difficulty || null,
+            calories: calories || null,
+            protein: protein || null,
         };
 
         const docRef = await addDoc(collection(db, 'posts'), postData);
@@ -145,7 +156,7 @@ export const subscribeToUserPosts = (
         );
     } catch (error) {
         console.error('Error setting up subscription:', error);
-        return () => {};
+        return () => { };
     }
 };
 
@@ -177,7 +188,7 @@ export const subscribeToFeedPosts = (
         );
     } catch (error) {
         console.error('Error setting up subscription:', error);
-        return () => {};
+        return () => { };
     }
 };
 

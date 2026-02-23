@@ -1,7 +1,7 @@
 ﻿import * as ImagePicker from 'expo-image-picker';
 import { collection, doc, getDoc, getDocs, increment, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { Camera, Image as LucideImage } from 'lucide-react-native';
+import { ArrowLeft, Camera, Image as LucideImage } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -108,8 +108,17 @@ export const EditProfileScreen = ({ navigation }: any) => {
                 const downloadURL = await getDownloadURL(storageRef);
 
                 setAvatarUrl(downloadURL);
+
+                // Update Firestore directly for immediate feedback
+                if (user) {
+                    await updateDoc(doc(db, 'profiles', user.uid), {
+                        avatar_url: downloadURL,
+                        updated_at: serverTimestamp(),
+                    });
+                }
+
                 setUploadingAvatar(false);
-                Alert.alert('Başarılı', 'Fotoğraf güncellendi!');
+                Alert.alert('Başarılı', 'Profil fotoğrafınız güncellendi!');
             }
         } catch (error: any) {
             console.error("Avatar upload error: ", error);
@@ -202,18 +211,35 @@ export const EditProfileScreen = ({ navigation }: any) => {
         );
     }
 
+    const headerHeight = 52 + insets.top;
+
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
+            {/* Custom Header */}
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={[styles.backButton, { borderColor: theme.border, backgroundColor: theme.glass }]}
+                >
+                    <ArrowLeft size={20} color={theme.text} />
+                </TouchableOpacity>
+                <View style={{ width: 40 }} />
+            </View>
+
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
-                keyboardVerticalOffset={insets.top + 10}
+                keyboardVerticalOffset={headerHeight}
             >
                 <ScrollView
                     contentContainerStyle={[styles.scrollContent]}
                     scrollIndicatorInsets={{ right: 1 }}
-                    bounces={false}
+                    bounces={true}
+                    showsVerticalScrollIndicator={false}
                 >
+                    <Text style={[styles.pageTitle, { color: theme.text, fontFamily: typography.display }]}>
+                        Kişisel Bilgiler
+                    </Text>
                     <GlassCard style={styles.card}>
                         <View style={styles.avatarContainer}>
                             <TouchableOpacity onPress={handleAvatarPick} style={styles.avatarwrapper}>
@@ -338,12 +364,33 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 20,
-        paddingTop: 20,
+        paddingTop: 10,
         paddingBottom: 40,
     },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        paddingHorizontal: 20,
+        paddingBottom: 10,
+        zIndex: 10,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        borderWidth: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    pageTitle: {
+        fontSize: 28,
+        paddingHorizontal: 4,
+        marginBottom: 24,
+    },
     card: {
-        padding: 20,
         width: '100%',
+        paddingVertical: 24,
     },
     label: {
         fontSize: 14,

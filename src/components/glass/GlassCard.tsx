@@ -5,6 +5,7 @@ import { GlassSurface } from './GlassSurface';
 interface GlassCardProps {
     children: React.ReactNode;
     style?: StyleProp<ViewStyle>;
+    contentStyle?: StyleProp<ViewStyle>;
     intensity?: number;
     borderRadius?: number;
     withShadow?: boolean;
@@ -13,8 +14,9 @@ interface GlassCardProps {
 export const GlassCard: React.FC<GlassCardProps> = ({
     children,
     style,
+    contentStyle,
     intensity = 32,
-    borderRadius = 22,
+    borderRadius = 18,
     withShadow = true,
 }) => {
     return (
@@ -23,6 +25,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
             borderRadius={borderRadius}
             intensity={intensity}
             withShadow={withShadow}
+            contentStyle={[{ padding: 14 }, contentStyle]}
         >
             {children}
         </GlassSurface>

@@ -1,12 +1,32 @@
 import { doc, onSnapshot } from 'firebase/firestore';
-import { Bell, ChevronRight, HeartPulse, HelpCircle, Lock, Palette, User, Archive } from 'lucide-react-native';
+import {
+    Archive,
+    ArrowLeft,
+    Bell,
+    ChevronRight,
+    HeartPulse,
+    HelpCircle,
+    Lock,
+    LogOut,
+    Palette,
+    User,
+} from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import {
+    ActionSheetIOS,
+    Alert,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { GlassCard } from '../../components/glass/GlassCard';
 import { useAuthStore } from '../../store/authStore';
-import { useTheme } from '../../theme/ThemeProvider';
+import { ThemeMode, useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
 type ItemProps = {
@@ -14,9 +34,7 @@ type ItemProps = {
     title: string;
     subtitle?: string;
     onPress?: () => void;
-    withToggle?: boolean;
-    toggleValue?: boolean;
-    onToggleChange?: (v: boolean) => void;
+    danger?: boolean;
 };
 
 const SettingsItem = ({
@@ -24,46 +42,36 @@ const SettingsItem = ({
     title,
     subtitle,
     onPress,
-    withToggle,
-    toggleValue,
-    onToggleChange,
+    danger,
 }: ItemProps) => {
     const { theme, typography } = useTheme();
 
     return (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.8} disabled={withToggle}>
+        <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
             <View style={[styles.itemRow, { borderColor: theme.border }]}>
                 <View style={styles.itemLeft}>
-                    <Icon size={20} color={colors.saffron} />
+                    <Icon size={20} color={danger ? colors.spiceRed : colors.saffron} />
                     <View style={styles.itemText}>
-                        <Text style={[styles.itemTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>{title}</Text>
+                        <Text style={[styles.itemTitle, {
+                            color: danger ? colors.spiceRed : theme.text,
+                            fontFamily: typography.bodyMedium,
+                        }]}>{title}</Text>
                         {subtitle ? (
                             <Text style={[styles.itemSubtitle, { color: theme.secondaryText, fontFamily: typography.body }]}>{subtitle}</Text>
                         ) : null}
                     </View>
                 </View>
-                {withToggle ? (
-                    <Switch
-                        value={!!toggleValue}
-                        onValueChange={onToggleChange}
-                        thumbColor="#FFFFFF"
-                        trackColor={{ false: '#E2E5E1', true: '#A9D4BE' }}
-                    />
-                ) : (
-                    <ChevronRight size={18} color={theme.secondaryText} />
-                )}
+                {!danger && <ChevronRight size={18} color={theme.secondaryText} />}
             </View>
         </TouchableOpacity>
     );
 };
 
 export const SettingsScreen = ({ navigation }: any) => {
-    const { theme, typography } = useTheme();
-    const { user } = useAuthStore();
+    const { theme, typography, isDark, themeMode, setThemeMode } = useTheme();
+    const { user, signOut } = useAuthStore();
     const insets = useSafeAreaInsets();
-    const headerHeight = 64 + insets.top;
     const [profile, setProfile] = useState<any>(null);
-    const [lightMode, setLightMode] = useState(true);
 
     useEffect(() => {
         if (!user) return;
@@ -73,18 +81,81 @@ export const SettingsScreen = ({ navigation }: any) => {
         return () => unsubscribe();
     }, [user]);
 
+    const getThemeLabel = () => {
+        switch (themeMode) {
+            case 'light': return 'Açık Mod';
+            case 'dark': return 'Koyu Mod';
+            case 'system': return 'Sistem';
+        }
+    };
+
+    const handleThemeSelect = () => {
+        if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    options: ['İptal', 'Açık Mod', 'Koyu Mod', 'Sistem'],
+                    cancelButtonIndex: 0,
+                    userInterfaceStyle: isDark ? 'dark' : 'light',
+                },
+                (index) => {
+                    const themes: (ThemeMode | null)[] = [null, 'light', 'dark', 'system'];
+                    if (themes[index]) setThemeMode(themes[index]!);
+                }
+            );
+        } else {
+            Alert.alert('Tema Seç', 'Uygulama temasını seçin', [
+                { text: 'Açık Mod', onPress: () => setThemeMode('light') },
+                { text: 'Koyu Mod', onPress: () => setThemeMode('dark') },
+                { text: 'Sistem', onPress: () => setThemeMode('system') },
+                { text: 'İptal', style: 'cancel' },
+            ]);
+        }
+    };
+
+    const handleSignOut = () => {
+        Alert.alert(
+            'Çıkış Yap',
+            'Çıkış yapmak istediğine emin misin?',
+            [
+                { text: 'Vazgeç', style: 'cancel' },
+                {
+                    text: 'Çıkış Yap',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await signOut();
+                        } catch (error) {
+                            Alert.alert('Hata', 'Çıkış yapılırken bir sorun oluştu.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <ScrollView
-                contentContainerStyle={[styles.content, { paddingTop: headerHeight + 12 }]}
-                showsVerticalScrollIndicator={false}
-                scrollIndicatorInsets={{ right: 1 }}
-                bounces={false}
-            >
-                <Text style={[styles.pageTitle, { color: theme.text, fontFamily: typography.display }]}>Ayarlar</Text>
+            {/* Simple Top Header for Back Button */}
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={[styles.backButton, { borderColor: theme.border, backgroundColor: theme.glass }]}
+                >
+                    <ArrowLeft size={20} color={theme.text} />
+                </TouchableOpacity>
+            </View>
 
+            <ScrollView
+                contentContainerStyle={styles.content}
+                showsVerticalScrollIndicator={false}
+                bounces={true}
+                alwaysBounceVertical={Platform.OS === 'ios'}
+            >
+                <Text style={[styles.largeTitle, { color: theme.text, fontFamily: typography.display }]}>
+                    Ayarlar
+                </Text>
                 <Text style={[styles.sectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>Hesap</Text>
-                <GlassCard style={styles.sectionCard}>
+                <GlassCard style={styles.sectionCard} contentStyle={{ padding: 0 }}>
                     <SettingsItem
                         icon={User}
                         title="Kişisel Bilgiler"
@@ -95,51 +166,61 @@ export const SettingsScreen = ({ navigation }: any) => {
                         icon={Lock}
                         title="Şifre ve Güvenlik"
                         subtitle="Şifre değiştirme işlemleri"
-                        onPress={() => {}}
+                        onPress={() => { }}
                     />
                 </GlassCard>
 
                 <Text style={[styles.sectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>İçerik</Text>
-                <GlassCard style={styles.sectionCard}>
+                <GlassCard style={styles.sectionCard} contentStyle={{ padding: 0 }}>
                     <SettingsItem
                         icon={HeartPulse}
                         title="Hareketlerin"
                         subtitle="Yorumlar, beğeniler ve etkileşimler"
-                        onPress={() => {}}
+                        onPress={() => { }}
                     />
                     <SettingsItem
                         icon={Archive}
                         title="Arşiv"
                         subtitle="Arşivlenen gönderiler ve eski hikayeler"
-                        onPress={() => {}}
+                        onPress={() => { }}
                     />
                 </GlassCard>
 
                 <Text style={[styles.sectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>Uygulama</Text>
-                <GlassCard style={styles.sectionCard}>
+                <GlassCard style={styles.sectionCard} contentStyle={{ padding: 0 }}>
                     <SettingsItem
                         icon={Palette}
                         title="Görünüm"
-                        subtitle={lightMode ? 'Açık Mod Açık' : 'Koyu Mod Açık'}
-                        withToggle
-                        toggleValue={lightMode}
-                        onToggleChange={setLightMode}
+                        subtitle={getThemeLabel()}
+                        onPress={handleThemeSelect}
                     />
                     <SettingsItem
                         icon={Bell}
                         title="Bildirimler"
                         subtitle="Uygulama bildirimlerini yönet"
-                        onPress={() => {}}
+                        onPress={() => { }}
                     />
                 </GlassCard>
 
-                <GlassCard style={styles.sectionCard}>
+                <GlassCard style={styles.sectionCard} contentStyle={{ padding: 0 }}>
                     <SettingsItem
                         icon={HelpCircle}
                         title="Yardım ve Destek"
-                        onPress={() => {}}
+                        onPress={() => { }}
                     />
                 </GlassCard>
+
+                {/* Sign Out Section */}
+                <View style={styles.signOutSection}>
+                    <GlassCard style={styles.sectionCard} contentStyle={{ padding: 0 }}>
+                        <SettingsItem
+                            icon={LogOut}
+                            title="Çıkış Yap"
+                            onPress={handleSignOut}
+                            danger
+                        />
+                    </GlassCard>
+                </View>
             </ScrollView>
         </View>
     );
@@ -149,31 +230,50 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    content: {
-        paddingHorizontal: 16,
-        paddingBottom: 120,
-    },
-    pageTitle: {
-        fontSize: 40,
-        marginBottom: 12,
-    },
-    sectionTitle: {
-        fontSize: 28,
-        marginTop: 14,
-        marginBottom: 10,
-    },
-    sectionCard: {
-        borderRadius: 18,
-        marginBottom: 16,
-        overflow: 'hidden',
-    },
-    itemRow: {
-        minHeight: 78,
+    header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        borderBottomWidth: 1,
+        paddingBottom: 12,
+    },
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        fontSize: 18,
+    },
+    largeTitle: {
+        fontSize: 32,
+        marginBottom: 20,
+    },
+    content: {
+        paddingHorizontal: 16,
+        paddingBottom: 40,
+    },
+    sectionTitle: {
+        fontSize: 13,
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    sectionCard: {
+        borderRadius: 18,
+        marginBottom: 8,
+        overflow: 'hidden',
+    },
+    itemRow: {
+        minHeight: 56,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
     },
     itemLeft: {
         flexDirection: 'row',
@@ -185,10 +285,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     itemTitle: {
-        fontSize: 24,
+        fontSize: 15,
         marginBottom: 2,
     },
     itemSubtitle: {
-        fontSize: 14,
+        fontSize: 13,
+    },
+    signOutSection: {
+        marginTop: 20,
     },
 });

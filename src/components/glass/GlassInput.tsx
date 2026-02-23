@@ -17,7 +17,10 @@ export const GlassInput: React.FC<GlassInputProps> = ({ containerStyle, ...props
             intensity={28}
             backgroundColor={isDark ? 'rgba(255, 255, 255, 0.08)' : theme.glass}
             borderColor={theme.border}
-            contentStyle={styles.content}
+            contentStyle={[
+                styles.content,
+                props.multiline && { alignItems: 'flex-start', paddingTop: 14 }
+            ]}
         >
             <TextInput
                 {...props}
@@ -28,6 +31,7 @@ export const GlassInput: React.FC<GlassInputProps> = ({ containerStyle, ...props
                         color: theme.text,
                         fontFamily: typography.body,
                     },
+                    props.multiline && { textAlignVertical: 'top' },
                     props.style,
                 ]}
             />

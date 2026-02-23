@@ -92,13 +92,13 @@ export const LoginScreen = ({ navigation }: any) => {
                             onPress={() => Alert.alert('Bilgi', 'Apple ile giriş yakında aktif olacak.')}
                             style={[styles.socialButton, { borderColor: colors.glassBorder }]}
                         >
-                            <Text style={[styles.socialIcon, { color: theme.text }]}></Text>
+                            <Text style={[styles.socialIcon, { color: theme.text }]}>A</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => Alert.alert('Bilgi', 'Facebook ile giriş yakında aktif olacak.')}
                             style={[styles.socialButton, { borderColor: colors.glassBorder }]}
                         >
-                            <Text style={[styles.socialIcon, { color: '#1877F2' }]}>f</Text>
+                            <Text style={[styles.socialIcon, { color: '#1877F2' }]}>F</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -143,7 +143,6 @@ const styles = StyleSheet.create({
     },
     card: {
         width: '100%',
-        padding: 24,
     },
     label: {
         fontSize: 14,

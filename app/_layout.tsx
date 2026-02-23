@@ -1,3 +1,4 @@
+import { XPProvider } from '@/src/context/XPContext';
 import { RootNavigator } from '@/src/navigation/RootNavigator';
 import { ThemeProvider } from '@/src/theme/ThemeProvider';
 import { StatusBar } from 'expo-status-bar';
@@ -8,8 +9,10 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <RootNavigator />
-        <StatusBar style="auto" />
+        <XPProvider>
+          <RootNavigator />
+          <StatusBar style="auto" />
+        </XPProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

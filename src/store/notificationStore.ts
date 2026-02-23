@@ -4,7 +4,7 @@ import { db } from '../api/firebase';
 
 export type NotificationType =
     | 'like' | 'comment' | 'follow' | 'follow_request'
-    | 'save' | 'mention' | 'level_up' | 'reward' | 'xp_gained' | 'system';
+    | 'save' | 'mention' | 'level_up' | 'reward' | 'xp_gained' | 'system' | 'list' | 'archive';
 
 export interface AppNotification {
     id: string;
@@ -89,7 +89,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             return unsubscribe;
         } catch (error) {
             console.error('Listener başlatma hatası:', error);
-            return () => {};
+            return () => { };
         }
     }
 }));

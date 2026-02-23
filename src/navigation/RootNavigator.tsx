@@ -6,6 +6,7 @@ import { db } from '../api/firebase';
 import { GlobalHeader } from '../components/common/GlobalHeader';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { RegisterScreen } from '../screens/auth/RegisterScreen';
+import { CreateScreen } from '../screens/create/CreateScreen';
 import { NotificationScreen } from '../screens/notification/NotificationScreen';
 import { IntroScreen } from '../screens/onboarding/IntroScreen';
 import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
@@ -94,35 +95,44 @@ export const RootNavigator = () => {
                                 component={TabNavigator}
                                 options={{
                                     gestureEnabled: false,
-                                    cardStyle: { backgroundColor: theme.background }
+                                    contentStyle: { backgroundColor: theme.background }
                                 }}
                             />
                             <Stack.Screen
                                 name="Notifications"
                                 component={NotificationScreen}
                                 options={{
-                                    cardStyle: { backgroundColor: theme.background }
+                                    contentStyle: { backgroundColor: theme.background }
                                 }}
                             />
                             <Stack.Screen
                                 name="EditProfile"
                                 component={EditProfileScreen}
                                 options={{
-                                    cardStyle: { backgroundColor: theme.background }
+                                    contentStyle: { backgroundColor: theme.background }
+                                }}
+                            />
+                            <Stack.Screen
+                                name="Create"
+                                component={CreateScreen}
+                                options={{
+                                    presentation: 'fullScreenModal',
+                                    animation: 'slide_from_bottom',
+                                    contentStyle: { backgroundColor: theme.background }
                                 }}
                             />
                             <Stack.Screen
                                 name="Settings"
                                 component={SettingsScreen}
                                 options={{
-                                    cardStyle: { backgroundColor: theme.background }
+                                    contentStyle: { backgroundColor: theme.background }
                                 }}
                             />
                             <Stack.Screen
                                 name="Appearance"
                                 component={AppearanceScreen}
                                 options={{
-                                    cardStyle: { backgroundColor: theme.background }
+                                    contentStyle: { backgroundColor: theme.background }
                                 }}
                             />
                         </>
