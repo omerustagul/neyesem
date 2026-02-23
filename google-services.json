@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "595809557381",
+    "project_id": "neyesem-36bdc",
+    "storage_bucket": "neyesem-36bdc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:595809557381:android:2be1e5083b96f56698c2ec",
+        "android_client_info": {
+          "package_name": "com.neyesem.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFesYAeXeim8kMELPLgpa8BGzmj_hZ12s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
