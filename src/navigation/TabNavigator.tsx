@@ -1,10 +1,10 @@
 ﻿import { useNavigation } from '@react-navigation/native';
 import React, { useRef, useState } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
-import PagerView from 'react-native-pager-view';
 import {
     useSharedValue
 } from 'react-native-reanimated';
+import { GlobalHeader } from '../components/common/GlobalHeader';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
 import { FeedScreen } from '../screens/feed/FeedScreen';
 import { ListsScreen } from '../screens/lists/ListsScreen';
@@ -12,6 +12,7 @@ import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { useNavigationStore } from '../store/navigationStore';
 import { useTheme } from '../theme/ThemeProvider';
 import { FloatingTabBar } from './FloatingTabBar';
+import PagerView from './PagerViewWrapper';
 
 const { width } = Dimensions.get('window');
 
@@ -80,6 +81,7 @@ export const TabNavigator = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <GlobalHeader />
             <PagerView
                 ref={pagerRef}
                 style={styles.pagerView}

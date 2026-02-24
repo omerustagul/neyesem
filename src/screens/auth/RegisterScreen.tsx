@@ -165,7 +165,7 @@ export const RegisterScreen = ({ navigation }: any) => {
                 gender,
                 birthday: formatBirthday(birthday),
                 city,
-                phone_number: phone,
+                phone_number: phone ? (phone.replace(/\D/g, '').startsWith('90') ? `+${phone.replace(/\D/g, '')}` : phone.replace(/\D/g, '').startsWith('0') ? `+90${phone.replace(/\D/g, '').slice(1)}` : `+90${phone.replace(/\D/g, '')}`) : '',
                 avatar_url: avatarUrl,
                 bio,
                 address: '',
@@ -267,7 +267,7 @@ export const RegisterScreen = ({ navigation }: any) => {
                 </TouchableOpacity>
                 <Text style={[styles.stepTitle, { color: theme.text, fontFamily: typography.display, flex: 1, marginLeft: 12 }]}>Profilini Parlat</Text>
             </View>
-            <Text style={[styles.stepDesc, { color: theme.secondaryText, fontFamily: typography.body }]}>Bu adım isteğe bağlıdır ancak ödül kazandırır! ✨</Text>
+            <Text style={[styles.stepDesc, { color: theme.secondaryText, fontFamily: typography.body }]}>Bu adım isteğe bağlıdır ancak ödül kazandırır!</Text>
 
             <GlassCard style={styles.card}>
                 <View style={styles.rewardsRow}>
@@ -332,7 +332,7 @@ export const RegisterScreen = ({ navigation }: any) => {
                 {currentStep === 'personal' && renderPersonalStep()}
                 {currentStep === 'profile' && renderProfileStep()}
 
-                <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.loginLink}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.loginLink}>
                     <Text style={[styles.loginText, { color: theme.secondaryText }]}>Zaten hesabın var mı? <Text style={{ color: colors.saffron, fontWeight: 'bold' }}>Giriş Yap</Text></Text>
                 </TouchableOpacity>
             </ScrollView>

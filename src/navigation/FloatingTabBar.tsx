@@ -7,7 +7,6 @@ import Animated, {
     interpolate,
     SharedValue,
     useAnimatedStyle,
-    useDerivedValue,
     useSharedValue,
     withTiming
 } from 'react-native-reanimated';
@@ -39,55 +38,39 @@ export const FloatingTabBar: React.FC<CustomTabBarProps> = ({
         tabPositions.value = newPositions;
     }, []);
 
-    // Smoothly interpolate the indicator position
-    const indicatorX = useDerivedValue(() => {
-        if (!scrollPosition || !scrollOffset) {
-            return tabPositions.value[state.index] || 0;
+    const indicatorStyle = useAnimatedStyle(() => {
+        const index = state.index;
+        const targetX = tabPositions.value[index] || 0;
+        let x = targetX;
+
+        // If we have scroll position from PagerView, use it for smooth transitions
+        if (scrollPosition && scrollOffset) {
+            const total = scrollPosition.value + scrollOffset.value;
+
+            // Pager indices: 0 (Home), 1 (Explore), 2 (Lists), 3 (Profile)
+            // mapped to tab positions: 0, 1, 3, 4
+            if (total <= 1) {
+                x = interpolate(total, [0, 1], [tabPositions.value[0], tabPositions.value[1]]);
+            } else if (total <= 2) {
+                x = interpolate(total, [1, 2], [tabPositions.value[1], tabPositions.value[3]]);
+            } else if (total <= 3) {
+                x = interpolate(total, [2, 3], [tabPositions.value[3], tabPositions.value[4]]);
+            }
         }
 
-        const total = scrollPosition.value + scrollOffset.value;
+        // Avoid showing indicator if position hasn't been calculated yet (still 0)
+        // except for the first tab (Home)
+        const isReady = x > 0 || index === 0;
 
-        // Tab indices: 0 (Home), 1 (Explore), 2 (Center/Create), 3 (Lists), 4 (Profile)
-        // Pager indices: 0, 1, 2, 3
-
-        if (total <= 1) {
-            // Smoothly move between 0 and 1
-            return interpolate(
-                total,
-                [0, 1],
-                [tabPositions.value[0], tabPositions.value[1]]
-            );
-        } else if (total <= 2) {
-            // Move between 1 and 2 (Tab 1 and Tab 3), skipping Tab 2
-            return interpolate(
-                total,
-                [1, 2],
-                [tabPositions.value[1], tabPositions.value[3]]
-            );
-        } else {
-            // Move between 2 and 3 (Tab 3 and Tab 4)
-            return interpolate(
-                total,
-                [2, 3],
-                [tabPositions.value[3], tabPositions.value[4]]
-            );
-        }
+        return {
+            transform: [{ translateX: x }],
+            width: 6,
+            opacity: withTiming(
+                (state.routes[state.index].name === 'CreatePlaceholder' || !isReady) ? 0 : 1,
+                { duration: 200 }
+            ),
+        };
     });
-
-    // Add a stretch effect based on the transition progress
-    const indicatorWidth = useDerivedValue(() => {
-        if (!scrollOffset) return 6;
-        const offset = scrollOffset.value;
-        // Stretch in the middle of transition
-        const stretch = Math.sin(offset * Math.PI) * 12;
-        return 6 + stretch;
-    });
-
-    const indicatorStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: indicatorX.value }],
-        width: indicatorWidth.value,
-        opacity: withTiming(state.routes[state.index].name === 'CreatePlaceholder' ? 0 : 1, { duration: 200 }),
-    }));
 
     const handleTabPress = (index: number, routeName: string) => {
         // Opacity is now handled automatically by state.index check in useAnimatedStyle

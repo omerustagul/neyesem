@@ -14,6 +14,7 @@ import {
     where
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { createNotification } from './notificationService';
 
 export interface Comment {
     id: string;
@@ -95,6 +96,20 @@ export const addComment = async (
         await updateDoc(doc(db, 'posts', postId), {
             comments_count: increment(1),
         });
+
+        // Send notification to post owner
+        const postSnap = await getDoc(doc(db, 'posts', postId));
+        if (postSnap.exists()) {
+            const postData = postSnap.data();
+            await createNotification(
+                postData.userId,
+                { uid: userId, username, avatar_url },
+                'comment',
+                `gönderine yorum yaptı: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`,
+                undefined,
+                { postId, commentId: docRef.id }
+            );
+        }
 
         return docRef.id;
     } catch (error) {

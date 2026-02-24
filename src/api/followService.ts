@@ -1,5 +1,6 @@
-import { arrayRemove, arrayUnion, doc, increment, writeBatch } from 'firebase/firestore';
+import { arrayRemove, arrayUnion, doc, getDoc, increment, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
+import { createNotification } from './notificationService';
 
 export const followUser = async (currentUserId: string, targetUserId: string) => {
     try {
@@ -20,6 +21,22 @@ export const followUser = async (currentUserId: string, targetUserId: string) =>
         });
 
         await batch.commit();
+
+        // Send notification
+        const senderSnap = await getDoc(doc(db, 'profiles', currentUserId));
+        const senderData = senderSnap.data();
+        if (senderData) {
+            await createNotification(
+                targetUserId,
+                {
+                    uid: currentUserId,
+                    username: senderData.username || 'Bir kullanıcı',
+                    avatar_url: senderData.avatar_url || ''
+                },
+                'follow',
+                `seni takip etmeye başladı.`
+            );
+        }
     } catch (error) {
         console.error('Error following user:', error);
         throw error;

@@ -83,7 +83,9 @@ export const CreateScreen = ({ navigation }: any) => {
             Alert.alert('Seviye Yetersiz', `Bu özellik için Level ${option.minLevel} gerekli! Seviye atlamak için daha fazla etkileşimde bulun.`);
             return;
         }
-        if (option.id === 'post' || option.id === 'story') {
+        if (option.id === 'story') {
+            navigation.navigate('CreateStory');
+        } else if (option.id === 'post') {
             setStep('post_media');
         } else if (option.id === 'embed') {
             setStep('embed_form');
@@ -158,6 +160,8 @@ export const CreateScreen = ({ navigation }: any) => {
                 }
             }
 
+            const tags = extractTags();
+
             await createPost(
                 user.uid,
                 username,
@@ -170,8 +174,13 @@ export const CreateScreen = ({ navigation }: any) => {
                 difficulty,
                 calories,
                 protein,
-                thumbnailUrl
+                thumbnailUrl,
+                tags
             );
+
+            // Reward XP
+            const { addXP } = useLevelStore.getState();
+            await addXP(user.uid, 24);
 
             Alert.alert('Başarılı', 'Gönderiniz yayınlandı!');
             resetForm();
@@ -181,6 +190,20 @@ export const CreateScreen = ({ navigation }: any) => {
         } finally {
             setIsCreating(false);
         }
+    };
+
+    const extractTags = () => {
+        const text = postCaption.toLowerCase();
+        const tags: string[] = [];
+        if (text.includes('türk') || text.includes('kebap') || text.includes('tavuk')) tags.push('turkish');
+        if (text.includes('italya') || text.includes('makarna') || text.includes('pizza')) tags.push('italian');
+        if (text.includes('asya') || text.includes('suşi') || text.includes('ramen')) tags.push('asian');
+        if (text.includes('vegan') || text.includes('sebze') || text.includes('salata')) tags.push('vegan');
+        if (text.includes('acı') || text.includes('pul biber')) tags.push('spicy');
+        if (text.includes('tatlı') || text.includes('pastane') || text.includes('şeker')) tags.push('sweet');
+        if (text.includes('sokak') || text.includes('burger')) tags.push('streetFood');
+        if (text.includes('ev yapımı') || text.includes('anne')) tags.push('homeCooking');
+        return tags;
     };
 
     const resetForm = () => {

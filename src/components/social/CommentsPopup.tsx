@@ -5,6 +5,7 @@ import { Alert, Keyboard, StyleSheet, Text, TouchableOpacity, View } from 'react
 import { Portal } from 'react-native-paper';
 import { Comment, addComment, deleteComment, subscribeToComments, toggleCommentLike, updateComment } from '../../api/commentService';
 import { useAuthStore } from '../../store/authStore';
+import { useLevelStore } from '../../store/levelStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
@@ -47,6 +48,11 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose })
                     inputText.trim()
                 );
             }
+
+            // Reward XP
+            const { addXP } = useLevelStore.getState();
+            await addXP(user.uid, 4);
+
             setInputText('');
             Keyboard.dismiss();
         } catch (error) {

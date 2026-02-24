@@ -1,7 +1,10 @@
 import { FontAwesome5 } from '@expo/vector-icons';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import React, { useState } from 'react';
+import * as Google from 'expo-auth-session/providers/google';
+import { Image as ExpoImage } from 'expo-image';
+import * as WebBrowser from 'expo-web-browser';
+import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword } from 'firebase/auth';
+import { collection, doc, getDoc, getDocs, query, setDoc } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 import { Alert, Dimensions, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
     Extrapolate,
@@ -18,11 +21,85 @@ import { GlassInput } from '../../components/glass/GlassInput';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
+WebBrowser.maybeCompleteAuthSession();
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type LoginMode = 'email' | 'phone';
 
-const SPRING_CONFIG = { damping: 20, stiffness: 150 };
+// Accelerated spring config for snappy feel
+const SPRING_CONFIG = { damping: 30, stiffness: 400 };
+
+// Separate component for Google Sign In to handle the hook safely
+const GoogleSignInButton = ({ onLoading, isDark }: { onLoading: (loading: boolean) => void, isDark: boolean }) => {
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'missing-ios-id',
+        androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || 'missing-android-id',
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'missing-web-id',
+    });
+
+    useEffect(() => {
+        if (response?.type === 'success' && response.params) {
+            const { id_token } = response.params;
+            if (id_token) {
+                handleGoogleSignIn(id_token);
+            }
+        }
+    }, [response]);
+
+    const handleGoogleSignIn = async (idToken: string) => {
+        onLoading(true);
+        try {
+            const credential = GoogleAuthProvider.credential(idToken);
+            const userCredential = await signInWithCredential(auth, credential);
+            const user = userCredential.user;
+
+            const profileRef = doc(db, 'profiles', user.uid);
+            const profileSnap = await getDoc(profileRef);
+
+            if (!profileSnap.exists()) {
+                const baseEmail = user.email || '';
+                await setDoc(profileRef, {
+                    uid: user.uid,
+                    email: baseEmail,
+                    username: (baseEmail ? baseEmail.split('@')[0].toLowerCase() : 'user') + Math.floor(Math.random() * 1000),
+                    display_name: user.displayName || 'Gurme Kullanıcı',
+                    avatar_url: user.photoURL || '',
+                    phone_number: '',
+                    gender: '',
+                    birthday: '',
+                    city: '',
+                    bio: '',
+                    created_at: new Date().toISOString(),
+                    level: 1,
+                    xp: 0,
+                    xp_next_level: 150,
+                    post_count: 0,
+                    followers: [],
+                    following: []
+                });
+            }
+        } catch (error: any) {
+            Alert.alert('Google Giriş Hatası', error.message);
+        } finally {
+            onLoading(false);
+        }
+    };
+
+    return (
+        <TouchableOpacity
+            onPress={() => promptAsync()}
+            disabled={!request}
+            style={[styles.socialButton, { borderColor: colors.glassBorder }]}
+        >
+            <ExpoImage
+                source="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png"
+                style={{ width: 28, height: 28 }}
+                contentFit="contain"
+            />
+        </TouchableOpacity>
+    );
+};
 
 export const LoginScreen = ({ navigation }: any) => {
     const { theme, typography, isDark } = useTheme();
@@ -34,6 +111,12 @@ export const LoginScreen = ({ navigation }: any) => {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [cardWidth, setCardWidth] = useState(0);
+
+    const hasGoogleIds = !!(
+        process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+        process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+        process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+    );
 
     // Animation shared values
     const modeSwitch = useSharedValue(0); // 0 = email, 1 = phone
@@ -53,14 +136,25 @@ export const LoginScreen = ({ navigation }: any) => {
         setLoading(true);
         try {
             let loginEmail = email;
-
             if (mode === 'phone') {
-                // Ensure phone has prefix if not present for query
-                const fullPhone = phone.startsWith('+90') ? phone : `+90${phone}`;
-                const q = query(collection(db, 'profiles'), where('phone_number', '==', fullPhone));
+                // Normalize input: get last 10 digits to be flexible (handles +90, 90, 0 prefixes)
+                const normalizedInput = phone.replace(/\D/g, '').slice(-10);
+
+                if (normalizedInput.length < 10) {
+                    throw new Error('Lütfen geçerli bir telefon numarası giriniz.');
+                }
+
+                // Fetch profiles to find the matching one (robust matching for messy DB data)
+                const q = query(collection(db, 'profiles'));
                 const snapshot = await getDocs(q);
-                if (!snapshot.empty) {
-                    loginEmail = snapshot.docs[0].data().email;
+
+                const matchedProfile = snapshot.docs.find(doc => {
+                    const dbPhone = (doc.data().phone_number || '').replace(/\D/g, '');
+                    return dbPhone.endsWith(normalizedInput);
+                });
+
+                if (matchedProfile) {
+                    loginEmail = matchedProfile.data().email;
                 } else {
                     throw new Error('Bu telefon numarası ile kayıtlı bir kullanıcı bulunamadı.');
                 }
@@ -75,12 +169,12 @@ export const LoginScreen = ({ navigation }: any) => {
     };
 
     const sliderStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: withSpring(modeSwitch.value * (cardWidth / 2), SPRING_CONFIG) }],
+        transform: [{ translateX: modeSwitch.value * (cardWidth / 2) }],
         width: cardWidth / 2,
     }));
 
     const inputContainerStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: withSpring(-modeSwitch.value * cardWidth, SPRING_CONFIG) }],
+        transform: [{ translateX: -modeSwitch.value * cardWidth }],
         flexDirection: 'row',
         width: cardWidth * 2,
     }));
@@ -135,31 +229,26 @@ export const LoginScreen = ({ navigation }: any) => {
                         </View>
 
                         {/* Sliding Inputs */}
-                        {cardWidth > 0 && (
-                            <View style={styles.inputsWrapper}>
+                        <View style={styles.inputsWrapper}>
+                            {cardWidth > 0 && (
                                 <Animated.View style={inputContainerStyle}>
                                     {/* Email Input */}
                                     <Animated.View style={[styles.inputGroup, { width: cardWidth }, emailOpacity]}>
-                                        <Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
-                                            E-posta Adresi
-                                        </Text>
                                         <GlassInput
-                                            placeholder="ornek@email.com"
+                                            placeholder="E-posta Adresi"
                                             value={email}
                                             onChangeText={setEmail}
                                             keyboardType="email-address"
                                             autoCapitalize="none"
+                                            containerStyle={styles.compactInput}
                                         />
                                     </Animated.View>
 
                                     {/* Phone Input */}
                                     <Animated.View style={[styles.inputGroup, { width: cardWidth }, phoneOpacity]}>
-                                        <Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
-                                            Telefon Numarası
-                                        </Text>
                                         <View style={styles.phoneInputContainer}>
                                             <View style={[styles.countryCode, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}>
-                                                <Text style={[styles.countryText, { color: theme.text, fontFamily: typography.bodyMedium }]}>🇹🇷 +90</Text>
+                                                <Text style={[styles.countryText, { color: theme.text, fontFamily: typography.bodyMedium }]}>+90</Text>
                                             </View>
                                             <View style={{ flex: 1 }}>
                                                 <GlassInput
@@ -168,23 +257,22 @@ export const LoginScreen = ({ navigation }: any) => {
                                                     onChangeText={setPhone}
                                                     keyboardType="phone-pad"
                                                     maxLength={10}
+                                                    containerStyle={styles.compactInput}
                                                 />
                                             </View>
                                         </View>
                                     </Animated.View>
                                 </Animated.View>
-                            </View>
-                        )}
+                            )}
+                        </View>
                     </View>
 
-                    <Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
-                        Şifre
-                    </Text>
                     <GlassInput
-                        placeholder="******"
+                        placeholder="Şifre"
                         value={password}
                         onChangeText={setPassword}
                         secureTextEntry
+                        containerStyle={styles.compactInput}
                     />
 
                     <GlassButton
@@ -200,23 +288,25 @@ export const LoginScreen = ({ navigation }: any) => {
                     </View>
 
                     <View style={styles.socialContainer}>
-                        <TouchableOpacity
-                            onPress={() => Alert.alert('Bilgi', 'Google ile giriş yakında aktif olacak.')}
-                            style={[styles.socialButton, { borderColor: colors.glassBorder }]}
-                        >
-                            <FontAwesome5 name="google" size={24} color="#DB4437" />
-                        </TouchableOpacity>
+                        {hasGoogleIds ? (
+                            <GoogleSignInButton onLoading={setLoading} isDark={isDark} />
+                        ) : (
+                            <TouchableOpacity
+                                onPress={() => Alert.alert('Eksik Yapılandırma', 'Google Giriş anahtarları .env dosyasında eksik. Lütfen EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID vb. alanları doldurun.')}
+                                style={[styles.socialButton, { borderColor: colors.glassBorder }]}
+                            >
+                                <ExpoImage
+                                    source="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png"
+                                    style={{ width: 28, height: 28, opacity: 0.5 }}
+                                    contentFit="contain"
+                                />
+                            </TouchableOpacity>
+                        )}
                         <TouchableOpacity
                             onPress={() => Alert.alert('Bilgi', 'Apple ile giriş yakında aktif olacak.')}
                             style={[styles.socialButton, { borderColor: colors.glassBorder }]}
                         >
                             <FontAwesome5 name="apple" size={24} color={isDark ? '#fff' : '#000'} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => Alert.alert('Bilgi', 'Facebook ile giriş yakında aktif olacak.')}
-                            style={[styles.socialButton, { borderColor: colors.glassBorder }]}
-                        >
-                            <FontAwesome5 name="facebook" size={24} color="#1877F2" />
                         </TouchableOpacity>
                     </View>
 
@@ -263,7 +353,7 @@ const styles = StyleSheet.create({
         height: 48,
         borderRadius: 24,
         padding: 4,
-        marginBottom: 8,
+        marginBottom: 16,
         borderWidth: 1,
         position: 'relative',
         overflow: 'hidden',
@@ -289,8 +379,10 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     inputGroup: {
-        width: SCREEN_WIDTH - 48, // Padding adjusted for card content
-        paddingRight: 16,
+        paddingRight: 1, // Small buffer
+    },
+    compactInput: {
+        marginVertical: 4,
     },
     phoneInputContainer: {
         flexDirection: 'row',
@@ -304,19 +396,13 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 8, // Matching GlassInput margin
-        marginBottom: 8,
+        marginVertical: 4,
     },
     countryText: {
         fontSize: 14,
     },
-    label: {
-        fontSize: 14,
-        marginBottom: 2,
-        marginTop: 16,
-    },
     button: {
-        marginTop: 20,
+        marginTop: 16,
     },
     linkButton: {
         marginTop: 24,
@@ -328,7 +414,7 @@ const styles = StyleSheet.create({
     dividerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 24,
+        marginVertical: 20,
     },
     divider: {
         flex: 1,
@@ -354,3 +440,5 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.05)',
     },
 });
+
+

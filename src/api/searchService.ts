@@ -54,10 +54,12 @@ export const searchPosts = async (searchTerm: string): Promise<Post[]> => {
         } as Post));
 
         return posts.filter(post =>
-            post.caption?.toLowerCase().includes(term) ||
-            post.username?.toLowerCase().includes(term) ||
-            (post as any).food_name?.toLowerCase().includes(term) ||
-            (post as any).display_name?.toLowerCase().includes(term)
+            (post.is_archived !== true) && (
+                post.caption?.toLowerCase().includes(term) ||
+                post.username?.toLowerCase().includes(term) ||
+                (post as any).food_name?.toLowerCase().includes(term) ||
+                (post as any).display_name?.toLowerCase().includes(term)
+            )
         ).slice(0, 15);
     } catch (error) {
         console.error('Error searching posts:', error);

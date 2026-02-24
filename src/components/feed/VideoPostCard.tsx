@@ -1,15 +1,17 @@
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { ResizeMode, Video } from 'expo-av';
-import { ChefHat, Flame, Gauge, MoreVertical, Play, Timer, User } from 'lucide-react-native';
+import { ChefHat, Flame, Gauge, MoreVertical, Play, Timer } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React from 'react';
-import { ActionSheetIOS, Alert, Dimensions, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActionSheetIOS, Alert, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { sendPalateSignal } from '../../api/palateService';
 import { archivePost, deletePost, Post } from '../../api/postService';
 import { useEmbed } from '../../hooks/useEmbed';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
+import { UserAvatar } from '../common/UserAvatar';
 import { CommentButton, InfoButton, LikeButton, SaveButton } from '../social/SocialButtons';
 
 const { width } = Dimensions.get('window');
@@ -44,6 +46,32 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
     const [isPaused, setIsPaused] = React.useState(false);
 
     const isOwner = user?.uid === post.userId;
+    const viewStartTime = React.useRef<number | null>(null);
+
+    React.useEffect(() => {
+        if (isVisible && isFocused && !isPaused) {
+            viewStartTime.current = Date.now();
+        } else if (viewStartTime.current) {
+            const duration = Date.now() - viewStartTime.current;
+            if (user && duration > 500) { // Ignore micro-views
+                const type = duration < 3000 ? 'view_under_3s' :
+                    duration < 10000 ? 'view_3_to_10s' : 'view_over_10s';
+                sendPalateSignal(user.uid, type, post.id, post.tags || []);
+            }
+            viewStartTime.current = null;
+        }
+
+        return () => {
+            if (viewStartTime.current && user) {
+                const duration = Date.now() - viewStartTime.current;
+                if (duration > 500) {
+                    const type = duration < 3000 ? 'view_under_3s' :
+                        duration < 10000 ? 'view_3_to_10s' : 'view_over_10s';
+                    sendPalateSignal(user.uid, type, post.id, post.tags || []);
+                }
+            }
+        };
+    }, [isVisible, isFocused, isPaused]);
 
     const handlePressMedia = () => {
         if (post.content_type === 'video' || post.content_type === 'embed') {
@@ -194,23 +222,22 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
         >
             {/* Header */}
             <View style={styles.header}>
-                <View style={[styles.userInfo, { flex: 1 }]}>
-                    <View style={[styles.avatar, { backgroundColor: `${colors.saffron}20` }]}>
-                        {post.avatar_url ? (
-                            <Image source={{ uri: post.avatar_url }} style={styles.avatarImage} />
-                        ) : (
-                            <User size={18} color={theme.secondaryText} />
-                        )}
-                    </View>
+                <TouchableOpacity
+                    style={[styles.userInfo, { flex: 1 }]}
+                    onPress={() => navigation.navigate('PublicProfile', { userId: post.userId })}
+                    activeOpacity={0.7}
+                >
+                    <UserAvatar
+                        userId={post.userId}
+                        size={38}
+                        style={styles.avatar}
+                    />
                     <View>
                         <Text style={[styles.username, { color: theme.text, fontFamily: typography.bodyMedium }]}>
                             {post.display_name || post.username}
                         </Text>
-                        <Text style={[styles.time, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                            @{post.username}
-                        </Text>
                     </View>
-                </View>
+                </TouchableOpacity>
                 {isOwner && (
                     <TouchableOpacity onPress={handleMorePress} style={styles.moreButton}>
                         <MoreVertical size={20} color={theme.secondaryText} />

@@ -1,10 +1,12 @@
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { useNavigation } from '@react-navigation/native';
+import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { Bookmark, Lock, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { GlassCard } from '../../components/glass/GlassCard';
+import { CreateListPopup } from '../../components/lists/CreateListPopup';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
@@ -19,11 +21,83 @@ const DEFAULT_LISTS = [
     }
 ];
 
+const ListCard = ({ list, onPress }: any) => {
+    const { theme, isDark, typography } = useTheme();
+    const [thumbnail, setThumbnail] = useState<string | null>(null);
+    const Icon = list.icon || Bookmark;
+
+    useEffect(() => {
+        const fetchThumbnail = async () => {
+            if (list.type === 'default') {
+                // Fetch latest saved post thumbnail for 'All Saved'
+                try {
+                    const q = query(
+                        collection(db, 'posts'),
+                        where('saved_by', 'array-contains', doc(db, 'profiles', 'dummy').id.split('/')[0] === 'dummy' ? 'placeholder' : 'none') // This is tricky for default
+                    );
+                    // For simplicity, just get the very latest post if it's default 'All Saved'
+                    // In a real app we'd fetch the user's latest saved post
+                } catch { }
+            } else if (list.postIds && list.postIds.length > 0) {
+                try {
+                    const postRef = doc(db, 'posts', list.postIds[list.postIds.length - 1]);
+                    const postSnap = await getDoc(postRef);
+                    if (postSnap.exists()) {
+                        setThumbnail(postSnap.data().thumbnail_url || postSnap.data().content_url);
+                    }
+                } catch { }
+            }
+        };
+        fetchThumbnail();
+    }, [list]);
+
+    return (
+        <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.gridItem}
+            onPress={onPress}
+        >
+            <GlassCard style={styles.listCard}>
+                {thumbnail && (
+                    <Image
+                        source={{ uri: thumbnail }}
+                        style={[StyleSheet.absoluteFill, { opacity: 0.15, borderRadius: 24 }]}
+                        resizeMode="cover"
+                        blurRadius={2}
+                    />
+                )}
+                <View style={styles.cardTopRow}>
+                    <View style={[styles.iconWrap, {
+                        backgroundColor: isDark ? 'rgba(255,178,0,0.1)' : 'rgba(255,178,0,0.05)',
+                    }]}>
+                        <Icon size={22} color={colors.saffron} />
+                    </View>
+                    {list.locked && (
+                        <View style={[styles.lockBadge, { borderColor: theme.border }]}>
+                            <Lock size={10} color={theme.secondaryText} />
+                        </View>
+                    )}
+                </View>
+                <View>
+                    <Text style={[styles.cardTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                        {list.title}
+                    </Text>
+                    <Text style={[styles.cardSubtitle, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                        {list.type === 'default' ? list.subtitle : `${list.postIds?.length || 0} içerik`}
+                    </Text>
+                </View>
+            </GlassCard>
+        </TouchableOpacity>
+    );
+};
+
 export const ListsScreen = () => {
     const { theme, isDark, typography } = useTheme();
     const { user } = useAuthStore();
     const insets = useSafeAreaInsets();
+    const navigation = useNavigation<any>();
     const [userLists, setUserLists] = useState<any[]>([]);
+    const [isCreateVisible, setIsCreateVisible] = useState(false);
     const headerHeight = 52 + insets.top;
 
     useEffect(() => {
@@ -59,7 +133,10 @@ export const ListsScreen = () => {
                     <Text style={[styles.title, { color: theme.text, fontFamily: typography.display }]}>
                         Listelerim
                     </Text>
-                    <TouchableOpacity activeOpacity={0.7}>
+                    <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setIsCreateVisible(true)}
+                    >
                         <View style={styles.addButton}>
                             <Plus size={20} color={colors.warmWhite} />
                         </View>
@@ -68,36 +145,21 @@ export const ListsScreen = () => {
 
                 <View style={styles.grid}>
                     {combinedLists.map((list) => {
-                        const Icon = list.icon || Bookmark;
                         return (
-                            <TouchableOpacity key={list.id} activeOpacity={0.7} style={styles.gridItem}>
-                                <GlassCard style={styles.listCard}>
-                                    <View style={styles.cardTopRow}>
-                                        <View style={[styles.iconWrap, {
-                                            backgroundColor: isDark ? 'rgba(255,178,0,0.1)' : 'rgba(255,178,0,0.05)',
-                                        }]}>
-                                            <Icon size={22} color={colors.saffron} />
-                                        </View>
-                                        {list.locked && (
-                                            <View style={[styles.lockBadge, { borderColor: theme.border }]}>
-                                                <Lock size={10} color={theme.secondaryText} />
-                                            </View>
-                                        )}
-                                    </View>
-                                    <View>
-                                        <Text style={[styles.cardTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                            {list.title}
-                                        </Text>
-                                        <Text style={[styles.cardSubtitle, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                                            {list.type === 'default' ? list.subtitle : `${list.posts_count || 0} içerik`}
-                                        </Text>
-                                    </View>
-                                </GlassCard>
-                            </TouchableOpacity>
+                            <ListCard
+                                key={list.id}
+                                list={list}
+                                onPress={() => navigation.navigate('ListDetail', { listId: list.id, listTitle: list.title })}
+                            />
                         );
                     })}
                 </View>
             </ScrollView>
+
+            <CreateListPopup
+                visible={isCreateVisible}
+                onClose={() => setIsCreateVisible(false)}
+            />
         </View>
     );
 };
@@ -129,14 +191,16 @@ const styles = StyleSheet.create({
     },
     grid: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        gap: 10,
+        flexWrap: 'wrap',
+        columnGap: 12,
+        rowGap: 12, // Ensure row gap matches column gap
+        marginTop: 8,
     },
     gridItem: {
-        flex: 1,
+        width: (Dimensions.get('window').width - 32 - 12) / 2,
     },
     listCard: {
-        minHeight: 150,
+        height: 160,
         justifyContent: 'space-between',
     },
     cardTopRow: {

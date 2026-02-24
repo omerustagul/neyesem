@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     },
     resultPostImage: {
         width: '100%',
-        height: 100,
+        aspectRatio: 0.75,
         borderRadius: 16,
         marginBottom: 4,
     },

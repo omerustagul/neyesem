@@ -1,10 +1,11 @@
 import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { ResizeMode, Video } from 'expo-av';
-import { ArrowLeft, Bookmark, Flame, Gauge, Heart, MessageCircle, MoreVertical, Play, Timer, User, Volume2, VolumeX } from 'lucide-react-native';
+import { ArrowLeft, Bookmark, Flame, Gauge, Heart, MessageCircle, MoreVertical, Play, Timer, Volume2, VolumeX } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActionSheetIOS, Alert, Dimensions, FlatList, Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActionSheetIOS, Alert, Dimensions, FlatList, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { archivePost, deletePost, Post, subscribeToFeedPosts, togglePostLike } from '../../api/postService';
+import { UserAvatar } from '../../components/common/UserAvatar';
 import { CommentsPopup } from '../../components/social/CommentsPopup';
 import { SavePopup } from '../../components/social/SavePopup';
 import { useAuthStore } from '../../store/authStore';
@@ -145,13 +146,11 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                             onPress={() => navigation.navigate('PublicProfile', { userId: post.userId })}
                             activeOpacity={0.7}
                         >
-                            <View style={[styles.avatar, { backgroundColor: colors.saffron }]}>
-                                {post.avatar_url ? (
-                                    <Image source={{ uri: post.avatar_url }} style={styles.avatarImage} />
-                                ) : (
-                                    <User size={18} color="#fff" />
-                                )}
-                            </View>
+                            <UserAvatar
+                                userId={post.userId}
+                                size={32}
+                                style={styles.avatar}
+                            />
                             <Text style={[styles.username, { fontFamily: typography.bodyMedium }]}>{post.username}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.followBtn}>

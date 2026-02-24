@@ -15,6 +15,8 @@
     where
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { createNotification } from './notificationService';
+import { sendPalateSignal } from './palateService';
 
 export interface Post {
     id: string;
@@ -39,6 +41,10 @@ export interface Post {
     calories?: number;
     protein?: string;
     thumbnail_url?: string;
+    tags?: string[];
+    chainId?: string;
+    parentPostId?: string;
+    isChainRoot?: boolean;
 }
 
 // Create post
@@ -54,7 +60,11 @@ export const createPost = async (
     difficulty?: string,
     calories?: number,
     protein?: string,
-    thumbnail_url?: string
+    thumbnail_url?: string,
+    tags: string[] = [],
+    chainId?: string,
+    parentPostId?: string,
+    isChainRoot?: boolean
 ): Promise<string> => {
     try {
         const postData = {
@@ -65,6 +75,15 @@ export const createPost = async (
             caption,
             content_type,
             content_url: content_url || null,
+            cooking_time: cooking_time || '',
+            difficulty: difficulty || '',
+            calories: calories || 0,
+            protein: protein || '',
+            thumbnail_url: thumbnail_url || '',
+            tags,
+            chainId: chainId || null,
+            parentPostId: parentPostId || null,
+            isChainRoot: isChainRoot || false,
             likes_count: 0,
             comments_count: 0,
             shares_count: 0,
@@ -74,11 +93,6 @@ export const createPost = async (
             is_archived: false,
             created_at: serverTimestamp(),
             updated_at: serverTimestamp(),
-            cooking_time: cooking_time || null,
-            difficulty: difficulty || null,
-            calories: calories || null,
-            protein: protein || null,
-            thumbnail_url: thumbnail_url || null,
         };
 
         const docRef = await addDoc(collection(db, 'posts'), postData);
@@ -109,7 +123,7 @@ export const getUserPosts = async (userId: string): Promise<Post[]> => {
                 id: docSnap.id,
                 ...docSnap.data(),
             } as Post))
-            .filter(p => !p.is_archived)
+            .filter(p => p.is_archived !== true)
             .sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
     } catch (error) {
         console.error('Error fetching user posts:', error);
@@ -121,8 +135,7 @@ export const getUserPosts = async (userId: string): Promise<Post[]> => {
 export const getFeedPosts = async (limitCount: number = 20): Promise<Post[]> => {
     try {
         const q = query(
-            collection(db, 'posts'),
-            where('is_archived', '==', false)
+            collection(db, 'posts')
         );
 
         const snapshot = await getDocs(q);
@@ -131,6 +144,7 @@ export const getFeedPosts = async (limitCount: number = 20): Promise<Post[]> => 
                 id: docSnap.id,
                 ...docSnap.data(),
             } as Post))
+            .filter(p => p.is_archived !== true)
             .sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0))
             .slice(0, limitCount);
     } catch (error) {
@@ -159,7 +173,7 @@ export const subscribeToUserPosts = (
                         id: docSnap.id,
                         ...docSnap.data(),
                     } as Post))
-                    .filter(p => !p.is_archived)
+                    .filter(p => p.is_archived !== true)
                     .sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
                 callback(posts);
             },
@@ -218,8 +232,7 @@ export const subscribeToFollowedFeed = (
         // Fetch ALL non-archived posts and filter in memory
         // This avoids composite index requirements (userId + is_archived)
         const q = query(
-            collection(db, 'posts'),
-            where('is_archived', '==', false)
+            collection(db, 'posts')
         );
 
         return onSnapshot(
@@ -232,7 +245,9 @@ export const subscribeToFollowedFeed = (
 
                 // If following someone, filter to only their posts
                 if (userIds && userIds.length > 0) {
-                    posts = posts.filter(p => userIds.includes(p.userId));
+                    posts = posts.filter(p => userIds.includes(p.userId) && p.is_archived !== true);
+                } else {
+                    posts = posts.filter(p => p.is_archived !== true);
                 }
 
                 // Sort by date desc, limit
@@ -256,9 +271,9 @@ export const subscribeToFeedPosts = (
     limitCount: number = 20
 ) => {
     try {
+        // Query all posts and filter in memory to avoid missing posts without is_archived field
         const q = query(
-            collection(db, 'posts'),
-            where('is_archived', '==', false)
+            collection(db, 'posts')
         );
 
         return onSnapshot(
@@ -269,16 +284,13 @@ export const subscribeToFeedPosts = (
                         id: docSnap.id,
                         ...docSnap.data(),
                     } as Post))
+                    .filter(p => p.is_archived !== true)
                     .sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0))
                     .slice(0, limitCount);
                 callback(posts);
             },
             (error) => {
-                if (error.code === 'failed-precondition') {
-                    console.warn('Feed index oluşturuluyor, lütfen bekleyin...');
-                } else {
-                    console.error('Error subscribing to feed posts:', error);
-                }
+                console.error('Error subscribing to feed posts:', error);
                 callback([]);
             }
         );
@@ -316,6 +328,27 @@ export const togglePostLike = async (
                 liked_by: arrayUnion(userId),
                 likes_count: increment(1),
             });
+
+            // Send Palate Signal
+            sendPalateSignal(userId, 'like', postId, post.tags || []);
+
+            // Send notification to post owner
+            const senderSnap = await getDoc(doc(db, 'profiles', userId));
+            const senderData = senderSnap.data();
+            if (senderData) {
+                await createNotification(
+                    post.userId,
+                    {
+                        uid: userId,
+                        username: senderData.username || 'Bir kullanıcı',
+                        avatar_url: senderData.avatar_url || ''
+                    },
+                    'like',
+                    `gönderini beğendi.`,
+                    undefined,
+                    { postId }
+                );
+            }
         }
     } catch (error) {
         console.error('Error toggling like:', error);

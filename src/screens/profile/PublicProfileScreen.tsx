@@ -7,9 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { followUser, unfollowUser } from '../../api/followService';
 import { Post, subscribeToUserPosts } from '../../api/postService';
-import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
+import { Story, subscribeToActiveStories } from '../../api/storyService';
 import { AnimatedLevelCard } from '../../components/level/AnimatedLevelCard';
 import { FollowListPopup } from '../../components/social/FollowListPopup';
+import { StoryViewer } from '../../components/social/StoryViewer';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
@@ -30,6 +31,8 @@ export const PublicProfileScreen = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isFollowing, setIsFollowing] = useState(false);
     const [followListType, setFollowListType] = useState<'followers' | 'following' | null>(null);
+    const [activeStories, setActiveStories] = useState<Story[]>([]);
+    const [viewerVisible, setViewerVisible] = useState(false);
 
     const insets = useSafeAreaInsets();
 
@@ -43,7 +46,6 @@ export const PublicProfileScreen = () => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     setProfile(data);
-
                     if (currentUser) {
                         setIsFollowing(data.followers?.includes(currentUser.uid) || false);
                     }
@@ -62,9 +64,14 @@ export const PublicProfileScreen = () => {
             setUserPosts(sortedPosts);
         });
 
+        const storiesUnsubscribe = subscribeToActiveStories([], userId, (stories) => {
+            setActiveStories(stories);
+        });
+
         return () => {
             unsubscribe();
             postsUnsubscribe();
+            storiesUnsubscribe();
         };
     }, [userId, currentUser]);
 
@@ -85,12 +92,6 @@ export const PublicProfileScreen = () => {
         }
     };
 
-    const stats = {
-        posts: profile?.post_count || 0,
-        followers: profile?.followers_count || 0,
-        following: profile?.following_count || 0,
-    };
-
     if (loading && !profile) {
         return (
             <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -101,34 +102,28 @@ export const PublicProfileScreen = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            {/* Custom Header */}
             <View style={[styles.header, { paddingTop: insets.top, backgroundColor: theme.background }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <ArrowLeft color={theme.text} size={24} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                    @{profile?.username}
-                </Text>
+                <Text style={[styles.headerTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>@{profile?.username}</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={isRefreshing}
-                        onRefresh={() => {
-                            setIsRefreshing(true);
-                            setTimeout(() => setIsRefreshing(false), 1000);
-                        }}
-                        tintColor={colors.saffron}
-                    />
-                }
+                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => { setIsRefreshing(true); setTimeout(() => setIsRefreshing(false), 1000); }} tintColor={colors.saffron} />}
             >
-                {/* Avatar & Profile Info */}
                 <View style={styles.profileInfo}>
-                    <View style={styles.avatarContainer}>
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => activeStories.length > 0 ? setViewerVisible(true) : null}
+                        style={[
+                            styles.avatarContainer,
+                            activeStories.length > 0 && { borderColor: colors.saffron, borderWidth: 3, padding: 3 }
+                        ]}
+                    >
                         {profile?.avatar_url ? (
                             <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
                         ) : (
@@ -136,92 +131,54 @@ export const PublicProfileScreen = () => {
                                 <UserIcon color={colors.oliveMuted} size={40} />
                             </View>
                         )}
-                    </View>
+                    </TouchableOpacity>
 
-                    <Text style={[styles.displayName, { color: theme.text, fontFamily: typography.display }]}>
-                        {profile?.display_name}
-                    </Text>
+                    <Text style={[styles.displayName, { color: theme.text, fontFamily: typography.display }]}>{profile?.display_name}</Text>
 
                     <View style={styles.statsRow}>
                         <View style={styles.statItem}>
-                            <Text style={[styles.statValue, { color: theme.text, fontFamily: typography.bodyMedium }]}>{stats.posts}</Text>
-                            <Text style={[styles.statLabel, { color: theme.secondaryText, fontFamily: typography.body }]}>Gönderi</Text>
+                            <Text style={[styles.statValue, { color: theme.text, fontFamily: typography.bodyMedium }]}>{profile?.post_count || 0}</Text>
+                            <Text style={styles.statLabel}>Gönderi</Text>
                         </View>
                         <TouchableOpacity style={styles.statItem} onPress={() => setFollowListType('followers')}>
-                            <Text style={[styles.statValue, { color: theme.text, fontFamily: typography.bodyMedium }]}>{stats.followers}</Text>
-                            <Text style={[styles.statLabel, { color: theme.secondaryText, fontFamily: typography.body }]}>Takipçi</Text>
+                            <Text style={[styles.statValue, { color: theme.text, fontFamily: typography.bodyMedium }]}>{profile?.followers_count || 0}</Text>
+                            <Text style={styles.statLabel}>Takipçi</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.statItem} onPress={() => setFollowListType('following')}>
-                            <Text style={[styles.statValue, { color: theme.text, fontFamily: typography.bodyMedium }]}>{stats.following}</Text>
-                            <Text style={[styles.statLabel, { color: theme.secondaryText, fontFamily: typography.body }]}>Takip</Text>
+                            <Text style={[styles.statValue, { color: theme.text, fontFamily: typography.bodyMedium }]}>{profile?.following_count || 0}</Text>
+                            <Text style={styles.statLabel}>Takip</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={[styles.bio, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                        {profile?.bio || 'Biyografi yok.'}
-                    </Text>
+                    <Text style={[styles.bio, { color: theme.secondaryText, fontFamily: typography.body }]}>{profile?.bio || 'Biyografi yok.'}</Text>
 
-                    {/* Follow Action */}
                     {currentUser?.uid !== userId && (
                         <TouchableOpacity
-                            style={[
-                                styles.followButton,
-                                { backgroundColor: isFollowing ? 'transparent' : colors.saffron, borderColor: colors.saffron, borderWidth: 1 }
-                            ]}
+                            style={[styles.followButton, { backgroundColor: isFollowing ? 'transparent' : colors.saffron, borderColor: colors.saffron, borderWidth: 1 }]}
                             onPress={handleFollowToggle}
                         >
-                            <Text style={[
-                                styles.followButtonText,
-                                { color: isFollowing ? colors.saffron : colors.warmWhite, fontFamily: typography.bodyMedium }
-                            ]}>
+                            <Text style={[styles.followButtonText, { color: isFollowing ? colors.saffron : colors.warmWhite, fontFamily: typography.bodyMedium }]}>
                                 {isFollowing ? 'Takibi Bırak' : 'Takip Et'}
                             </Text>
                         </TouchableOpacity>
                     )}
                 </View>
 
-                {/* Level Card */}
-                <AnimatedLevelCard
-                    mini
-                    level={profile?.level || 1}
-                    xp={profile?.xp || 0}
-                    xpNext={profile?.xp_next_level || 100}
-                    levelName={profile?.level_name || 'Gurme'}
-                />
+                <AnimatedLevelCard mini level={profile?.level || 1} xp={profile?.xp || 0} xpNext={profile?.xp_next_level || 100} levelName={profile?.level_name || 'Gurme'} />
 
-                {/* Posts Section */}
                 <View style={styles.postsSection}>
-                    <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.display }]}>
-                        Gönderiler
-                    </Text>
-
+                    <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.display }]}>Gönderiler</Text>
                     {userPosts.length === 0 ? (
                         <View style={styles.emptyState}>
-                            <Text style={{ color: theme.secondaryText, fontFamily: typography.body }}>Henüz gönderi yok.</Text>
+                            <Text style={{ color: theme.secondaryText }}>Henüz gönderi yok.</Text>
                         </View>
                     ) : (
                         <View style={styles.postsGrid}>
-                            {userPosts.map((post) => {
-                                return (
-                                    <TouchableOpacity
-                                        key={post.id}
-                                        style={styles.gridItem}
-                                        onPress={() => navigation.navigate('Reels', { postId: post.id })}
-                                    >
-                                        {post.content_type === 'video' && post.content_url ? (
-                                            <VideoThumbnail
-                                                videoUri={post.content_url}
-                                                thumbnailUri={post.thumbnail_url}
-                                                style={styles.gridImage}
-                                            />
-                                        ) : post.thumbnail_url || post.content_url ? (
-                                            <Image source={{ uri: post.thumbnail_url || post.content_url }} style={styles.gridImage} />
-                                        ) : (
-                                            <View style={[styles.gridImage, { backgroundColor: colors.glassBorder }]} />
-                                        )}
-                                    </TouchableOpacity>
-                                );
-                            })}
+                            {userPosts.map(post => (
+                                <TouchableOpacity key={post.id} style={styles.gridItem} onPress={() => navigation.navigate('Reels', { postId: post.id })}>
+                                    <Image source={{ uri: post.thumbnail_url || post.content_url }} style={styles.gridImage} />
+                                </TouchableOpacity>
+                            ))}
                         </View>
                     )}
                 </View>
@@ -234,115 +191,34 @@ export const PublicProfileScreen = () => {
                     onClose={() => setFollowListType(null)}
                 />
             )}
+
+            <StoryViewer visible={viewerVisible} stories={activeStories} onClose={() => setViewerVisible(false)} />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        height: Platform.OS === 'ios' ? 100 : 70,
-        zIndex: 10,
-    },
-    backButton: {
-        padding: 8,
-    },
-    headerTitle: {
-        fontSize: 16,
-    },
-    scrollContent: {
-        paddingBottom: 40,
-    },
-    profileInfo: {
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginTop: 10,
-    },
-    avatarContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        marginBottom: 16,
-        overflow: 'hidden',
-    },
-    avatarImage: {
-        width: '100%',
-        height: '100%',
-    },
-    avatarFallback: {
-        width: '100%',
-        height: '100%',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    displayName: {
-        fontSize: 24,
-        marginBottom: 16,
-    },
-    statsRow: {
-        flexDirection: 'row',
-        width: '100%',
-        justifyContent: 'space-around',
-        marginBottom: 20,
-    },
-    statItem: {
-        alignItems: 'center',
-    },
-    statValue: {
-        fontSize: 18,
-    },
-    statLabel: {
-        fontSize: 12,
-        opacity: 0.7,
-    },
-    bio: {
-        fontSize: 14,
-        textAlign: 'center',
-        marginBottom: 20,
-        lineHeight: 20,
-    },
-    followButton: {
-        width: '100%',
-        height: 48,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 24,
-    },
-    followButtonText: {
-        fontSize: 15,
-    },
-    postsSection: {
-        paddingHorizontal: 16,
-        marginTop: 20,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        marginBottom: 16,
-    },
-    postsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: -2,
-    },
-    gridItem: {
-        width: GRID_ITEM_SIZE,
-        height: GRID_ITEM_SIZE * 1.33,
-        padding: 2,
-    },
-    gridImage: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 12,
-    },
-    emptyState: {
-        alignItems: 'center',
-        paddingVertical: 40,
-    },
+    container: { flex: 1 },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: Platform.OS === 'ios' ? 100 : 70, zIndex: 10 },
+    backButton: { padding: 8 },
+    headerTitle: { fontSize: 16 },
+    scrollContent: { paddingBottom: 40 },
+    profileInfo: { alignItems: 'center', paddingHorizontal: 20, marginTop: 10 },
+    avatarContainer: { width: 100, height: 100, borderRadius: 50, marginBottom: 16, justifyContent: 'center', alignItems: 'center' },
+    avatarImage: { width: '100%', height: '100%', borderRadius: 50 },
+    avatarFallback: { width: '100%', height: '100%', borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
+    displayName: { fontSize: 24, marginBottom: 16 },
+    statsRow: { flexDirection: 'row', width: '100%', justifyContent: 'space-around', marginBottom: 20 },
+    statItem: { alignItems: 'center' },
+    statValue: { fontSize: 18 },
+    statLabel: { fontSize: 12, opacity: 0.7 },
+    bio: { fontSize: 14, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+    followButton: { width: '100%', height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+    followButtonText: { fontSize: 15 },
+    postsSection: { paddingHorizontal: 16, marginTop: 20 },
+    sectionTitle: { fontSize: 18, marginBottom: 16 },
+    postsGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -2 },
+    gridItem: { width: GRID_ITEM_SIZE, height: GRID_ITEM_SIZE * 1.33, padding: 2 },
+    gridImage: { width: '100%', height: '100%', borderRadius: 12 },
+    emptyState: { alignItems: 'center', paddingVertical: 40 },
 });

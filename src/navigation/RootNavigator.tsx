@@ -1,15 +1,19 @@
 ﻿import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { db } from '../api/firebase';
-import { GlobalHeader } from '../components/common/GlobalHeader';
+import { AppNotification } from '../components/common/AppNotification';
+import { useNotification } from '../context/NotificationContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { RegisterScreen } from '../screens/auth/RegisterScreen';
 import { CreateScreen } from '../screens/create/CreateScreen';
+import { CreateStoryScreen } from '../screens/create/CreateStoryScreen';
 import { EditPostScreen } from '../screens/create/EditPostScreen';
 import { ReelsScreen } from '../screens/feed/ReelsScreen';
 import { FoodDetailScreen } from '../screens/food/FoodDetailScreen';
+import { ListDetailScreen } from '../screens/lists/ListDetailScreen';
 import { NotificationScreen } from '../screens/notification/NotificationScreen';
 import { IntroScreen } from '../screens/onboarding/IntroScreen';
 import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
@@ -82,108 +86,133 @@ export const RootNavigator = () => {
         );
     }
 
+    const { notificationHeight } = useNotification();
+
     return (
         <View style={{ flex: 1, backgroundColor: theme.background }}>
-            <Stack.Navigator
-                screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: theme.background }
-                }}
+            <AppNotification />
+            <MotiView
+                animate={{ marginTop: notificationHeight }}
+                transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+                style={{ flex: 1 }}
             >
-                {user ? (
-                    !isIntroSeen ? (
-                        <Stack.Screen name="Intro" component={IntroScreen} />
+                <Stack.Navigator
+                    screenOptions={{
+                        headerShown: false,
+                        contentStyle: { backgroundColor: theme.background }
+                    }}
+                >
+                    {user ? (
+                        !isIntroSeen ? (
+                            <Stack.Screen name="Intro" component={IntroScreen} />
+                        ) : (
+                            <>
+                                <Stack.Screen
+                                    name="Main"
+                                    component={TabNavigator}
+                                    options={{
+                                        gestureEnabled: false,
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="Notifications"
+                                    component={NotificationScreen}
+                                    options={{
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="EditProfile"
+                                    component={EditProfileScreen}
+                                    options={{
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="PublicProfile"
+                                    component={PublicProfileScreen}
+                                    options={{
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="Create"
+                                    component={CreateScreen}
+                                    options={{
+                                        presentation: 'fullScreenModal',
+                                        animation: 'slide_from_bottom',
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="Settings"
+                                    component={SettingsScreen}
+                                    options={{
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="CreateStory"
+                                    component={CreateStoryScreen}
+                                    options={{
+                                        presentation: 'fullScreenModal',
+                                        animation: 'slide_from_bottom',
+                                        headerShown: false
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="ListDetail"
+                                    component={ListDetailScreen}
+                                    options={{
+                                        headerShown: false,
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="Appearance"
+                                    component={AppearanceScreen}
+                                    options={{
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="Archive"
+                                    component={ArchiveScreen}
+                                    options={{
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="EditPost"
+                                    component={EditPostScreen}
+                                    options={{
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="Reels"
+                                    component={ReelsScreen}
+                                    options={{
+                                        animation: 'slide_from_right',
+                                        gestureEnabled: true,
+                                        gestureDirection: 'horizontal',
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="FoodDetail"
+                                    component={FoodDetailScreen}
+                                />
+                            </>
+                        )
                     ) : (
                         <>
-                            <Stack.Screen
-                                name="Main"
-                                component={TabNavigator}
-                                options={{
-                                    gestureEnabled: false,
-                                    contentStyle: { backgroundColor: theme.background }
-                                }}
-                            />
-                            <Stack.Screen
-                                name="Notifications"
-                                component={NotificationScreen}
-                                options={{
-                                    contentStyle: { backgroundColor: theme.background }
-                                }}
-                            />
-                            <Stack.Screen
-                                name="EditProfile"
-                                component={EditProfileScreen}
-                                options={{
-                                    contentStyle: { backgroundColor: theme.background }
-                                }}
-                            />
-                            <Stack.Screen
-                                name="PublicProfile"
-                                component={PublicProfileScreen}
-                                options={{
-                                    contentStyle: { backgroundColor: theme.background }
-                                }}
-                            />
-                            <Stack.Screen
-                                name="Create"
-                                component={CreateScreen}
-                                options={{
-                                    presentation: 'fullScreenModal',
-                                    animation: 'slide_from_bottom',
-                                    contentStyle: { backgroundColor: theme.background }
-                                }}
-                            />
-                            <Stack.Screen
-                                name="Settings"
-                                component={SettingsScreen}
-                                options={{
-                                    contentStyle: { backgroundColor: theme.background }
-                                }}
-                            />
-                            <Stack.Screen
-                                name="Appearance"
-                                component={AppearanceScreen}
-                                options={{
-                                    contentStyle: { backgroundColor: theme.background }
-                                }}
-                            />
-                            <Stack.Screen
-                                name="Archive"
-                                component={ArchiveScreen}
-                                options={{
-                                    contentStyle: { backgroundColor: theme.background }
-                                }}
-                            />
-                            <Stack.Screen
-                                name="EditPost"
-                                component={EditPostScreen}
-                                options={{
-                                    contentStyle: { backgroundColor: theme.background }
-                                }}
-                            />
-                            <Stack.Screen
-                                name="Reels"
-                                component={ReelsScreen}
-                                options={{
-                                    animation: 'slide_from_right',
-                                    gestureEnabled: true,
-                                    gestureDirection: 'horizontal',
-                                }}
-                            />
-                            <Stack.Screen
-                                name="FoodDetail"
-                                component={FoodDetailScreen}
-                            />
+                            <Stack.Screen name="Login" component={LoginScreen} />
+                            <Stack.Screen name="Register" component={RegisterScreen} />
                         </>
-                    )
-                ) : (
-                    <>
-                        <Stack.Screen name="Login" component={LoginScreen} />
-                        <Stack.Screen name="Register" component={RegisterScreen} />
-                    </>
-                )}
-            </Stack.Navigator>
-            {user && isIntroSeen && <GlobalHeader />}
+                    )}
+                </Stack.Navigator>
+            </MotiView>
         </View>
     );
 };

@@ -1,3 +1,4 @@
+import { NotificationProvider } from '@/src/context/NotificationContext';
 import { XPProvider } from '@/src/context/XPContext';
 import { RootNavigator } from '@/src/navigation/RootNavigator';
 import { ThemeProvider } from '@/src/theme/ThemeProvider';
@@ -12,10 +13,12 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PaperProvider>
         <ThemeProvider>
-          <XPProvider>
-            <RootNavigator />
-            <StatusBar style="auto" />
-          </XPProvider>
+          <NotificationProvider>
+            <XPProvider>
+              <RootNavigator />
+              <StatusBar style="auto" />
+            </XPProvider>
+          </NotificationProvider>
         </ThemeProvider>
       </PaperProvider>
     </GestureHandlerRootView>

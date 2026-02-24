@@ -2,20 +2,17 @@ import { getFocusedRouteNameFromRoute, useNavigation, useNavigationState } from 
 import { BlurView } from 'expo-blur';
 import { Bell, ChevronLeft } from 'lucide-react-native';
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigationStore } from '../../store/navigationStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
-// Screens that have their own custom header — GlobalHeader hides itself
-const HIDDEN_ON_SCREENS = ['Settings', 'Create', 'EditProfile', 'CreatePlaceholder', 'Reels', 'FoodDetail', 'PublicProfile', 'Archive', 'EditPost'];
+// Screens where the GlobalHeader should be visible (Whitelist)
+const SHOW_ON_SCREENS = ['Feed', 'Explore', 'Lists', 'Profile'];
 
 const ROUTE_TITLES: Record<string, string> = {
-    'Notifications': 'Bildirimler',
-    'Appearance': 'Görünüm',
-    'EditProfile': 'Profili Düzenle',
     'Explore': 'Keşfet',
     'Lists': 'Listelerim',
     'Profile': 'Profil',
@@ -45,8 +42,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
     // Resolve the actual screen name (either stack screen or pager tab)
     const currentRouteName = currentStackRoute === 'Main' ? activeTab : currentStackRoute;
 
-    // Hide header on screens with custom headers
-    if (HIDDEN_ON_SCREENS.includes(currentRouteName)) {
+    // Only show header on specific main screens
+    if (!SHOW_ON_SCREENS.includes(currentRouteName)) {
         return null;
     }
 
@@ -93,13 +90,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
                         )}
                     </View>
 
-                    {displayTitle ? (
-                        <Text style={[styles.title, { color: theme.text, fontFamily: typography.display }]}>
-                            {displayTitle}
-                        </Text>
-                    ) : (
-                        <Image source={logo} style={styles.logo} resizeMode="contain" />
-                    )}
+                    <Image source={logo} style={styles.logo} resizeMode="contain" />
 
                     <TouchableOpacity
                         style={styles.notificationButton}
