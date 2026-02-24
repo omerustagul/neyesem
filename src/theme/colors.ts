@@ -6,7 +6,7 @@ export const colors = {
   // Surfaces
   cream: '#ffffff8f',
   charcoalGrill: '#0d0e0e8a',
-  warmWhite: '#ffffff8e',
+  warmWhite: '#ffffffcf',
 
   // Text / supportive
   oliveDark: '#176E43',
@@ -37,7 +37,8 @@ export const lightTheme = {
 
 export const darkTheme = {
   background: '#000000f4',
-  surface: '#000000b1',
+  glassBackground: colors.glassDark,
+  surface: '#000000c1',
   primary: colors.saffron,
   accent: colors.terracotta,
   text: '#ECF6EF',

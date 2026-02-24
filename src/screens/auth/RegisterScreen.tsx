@@ -73,9 +73,11 @@ export const RegisterScreen = ({ navigation }: any) => {
     };
 
     const formatBirthday = (date: Date) => {
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
+        // Ensure we are working with the date at noon to avoid day shift due to timezones
+        const d = new Date(date);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
         return `${day}.${month}.${year}`;
     };
 
@@ -113,8 +115,14 @@ export const RegisterScreen = ({ navigation }: any) => {
     };
 
     const handlePickImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('İzin Gerekli', 'Fotoğraf seçebilmek için galeri erişim izni vermelisiniz.');
+            return;
+        }
+
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [1, 1],
             quality: 0.7,
@@ -157,7 +165,7 @@ export const RegisterScreen = ({ navigation }: any) => {
                 gender,
                 birthday: formatBirthday(birthday),
                 city,
-                phone_number: phone,
+                phone_number: phone ? (phone.replace(/\D/g, '').startsWith('90') ? `+${phone.replace(/\D/g, '')}` : phone.replace(/\D/g, '').startsWith('0') ? `+90${phone.replace(/\D/g, '').slice(1)}` : `+90${phone.replace(/\D/g, '')}`) : '',
                 avatar_url: avatarUrl,
                 bio,
                 address: '',
@@ -259,7 +267,7 @@ export const RegisterScreen = ({ navigation }: any) => {
                 </TouchableOpacity>
                 <Text style={[styles.stepTitle, { color: theme.text, fontFamily: typography.display, flex: 1, marginLeft: 12 }]}>Profilini Parlat</Text>
             </View>
-            <Text style={[styles.stepDesc, { color: theme.secondaryText, fontFamily: typography.body }]}>Bu adım isteğe bağlıdır ancak ödül kazandırır! ✨</Text>
+            <Text style={[styles.stepDesc, { color: theme.secondaryText, fontFamily: typography.body }]}>Bu adım isteğe bağlıdır ancak ödül kazandırır!</Text>
 
             <GlassCard style={styles.card}>
                 <View style={styles.rewardsRow}>
@@ -290,10 +298,11 @@ export const RegisterScreen = ({ navigation }: any) => {
                 <GlassInput
                     value={bio}
                     onChangeText={setBio}
-                    placeholder="Kısaca kendinden bahset (örn: En sevdiğim mutfak İtalyan!)"
+                    placeholder="Kendinden bahset (örn: En sevdiğim mutfak İtalyan!)"
                     multiline
-                    numberOfLines={3}
-                    containerStyle={{ height: 72 }}
+                    numberOfLines={4}
+                    containerStyle={styles.bioInputContainer}
+                    style={styles.bioInput}
                 />
 
                 <GlassButton title="Kayıt Ol" onPress={handleFinish} loading={loading} style={{ marginTop: 24 }} />
@@ -323,7 +332,7 @@ export const RegisterScreen = ({ navigation }: any) => {
                 {currentStep === 'personal' && renderPersonalStep()}
                 {currentStep === 'profile' && renderProfileStep()}
 
-                <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.loginLink}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.loginLink}>
                     <Text style={[styles.loginText, { color: theme.secondaryText }]}>Zaten hesabın var mı? <Text style={{ color: colors.saffron, fontWeight: 'bold' }}>Giriş Yap</Text></Text>
                 </TouchableOpacity>
             </ScrollView>
@@ -342,8 +351,13 @@ export const RegisterScreen = ({ navigation }: any) => {
                                 value={birthday}
                                 mode="date"
                                 display="spinner"
+                                textColor={theme.text}
                                 onChange={(e, date) => {
-                                    if (date) setBirthday(date);
+                                    if (date) {
+                                        const normalizedDate = new Date(date);
+                                        normalizedDate.setHours(12, 0, 0, 0);
+                                        setBirthday(normalizedDate);
+                                    }
                                 }}
                             />
                         </View>
@@ -359,7 +373,11 @@ export const RegisterScreen = ({ navigation }: any) => {
                     display="default"
                     onChange={(e, date) => {
                         setShowDatePicker(false);
-                        if (date) setBirthday(date);
+                        if (date) {
+                            const normalizedDate = new Date(date);
+                            normalizedDate.setHours(12, 0, 0, 0);
+                            setBirthday(normalizedDate);
+                        }
                     }}
                 />
             )}
@@ -390,6 +408,12 @@ const styles = StyleSheet.create({
     plusCircle: { position: 'absolute', bottom: 0, right: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: colors.saffron, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff' },
     skipBtn: { marginTop: 16, alignItems: 'center' },
     skipText: { fontSize: 14, opacity: 0.7 },
+    bioInputContainer: {
+        height: 120,
+    },
+    bioInput: {
+        height: '100%',
+    },
     loginLink: { marginTop: 30, alignItems: 'center' },
     loginText: { fontSize: 14 },
     datePickerModal: {

@@ -42,6 +42,7 @@ export const GlassInput: React.FC<GlassInputProps> = ({ containerStyle, ...props
 const styles = StyleSheet.create({
     container: {
         marginVertical: 8,
+        width: '100%',
     },
     content: {
         flexDirection: 'row',

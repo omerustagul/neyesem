@@ -1,60 +1,78 @@
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { Bookmark, Compass, Home, PlusCircle, User } from 'lucide-react-native';
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback } from 'react';
 import { LayoutChangeEvent, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
+    interpolate,
+    SharedValue,
     useAnimatedStyle,
+    useDerivedValue,
     useSharedValue,
-    withSequence,
     withSpring,
-    withTiming,
+    withTiming
 } from 'react-native-reanimated';
 import { useTheme } from '../theme/ThemeProvider';
 import { colors } from '../theme/colors';
 
-const SPRING_CONFIG = { damping: 18, stiffness: 200, mass: 0.8 };
+const SPRING_CONFIG = { damping: 20, stiffness: 250, mass: 0.8 };
 
-export const FloatingTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
+interface CustomTabBarProps extends BottomTabBarProps {
+    scrollPosition?: SharedValue<number>;
+    scrollOffset?: SharedValue<number>;
+}
+
+export const FloatingTabBar: React.FC<CustomTabBarProps> = ({
+    state,
+    navigation,
+    scrollPosition,
+    scrollOffset
+}) => {
     const { theme, isDark } = useTheme();
-    const tabPositions = useRef<number[]>([]);
-    const indicatorX = useSharedValue(0);
-    const indicatorWidth = useSharedValue(6);
+    const tabPositions = useSharedValue<number[]>([0, 0, 0, 0, 0]);
     const indicatorOpacity = useSharedValue(1);
 
     const onTabLayout = useCallback((index: number, event: LayoutChangeEvent) => {
         const { x, width } = event.nativeEvent.layout;
-        const centerX = x + width / 2 - 3; // 3 = half of indicator width(6)
-        tabPositions.current[index] = centerX;
+        const centerX = x + width / 2 - 3; // 3 = half of indicator 6
+        const newPositions = [...tabPositions.value];
+        newPositions[index] = centerX;
+        tabPositions.value = newPositions;
+    }, []);
 
-        // Set initial position for focused tab
-        if (index === state.index && state.routes[state.index].name !== 'CreatePlaceholder') {
-            indicatorX.value = centerX;
-        }
-    }, [state.index]);
+    // Simplified stable indicator position
+    const indicatorX = useDerivedValue(() => {
+        const index = state.index;
+        const targetX = tabPositions.value[index] || 0;
 
-    const handleTabPress = (index: number, routeName: string) => {
-        if (routeName === 'CreatePlaceholder') {
-            indicatorOpacity.value = withTiming(0, { duration: 100 });
-        } else {
-            indicatorOpacity.value = withTiming(1, { duration: 200 });
-            const targetX = tabPositions.current[index];
-            if (targetX !== undefined) {
-                // Pill stretch effect during transition
-                indicatorWidth.value = withSequence(
-                    withSpring(16, SPRING_CONFIG),
-                    withSpring(6, { ...SPRING_CONFIG, damping: 14 })
-                );
-                indicatorX.value = withSpring(targetX, SPRING_CONFIG);
+        // If we have scroll position from PagerView, use it for smooth transitions
+        if (scrollPosition && scrollOffset) {
+            const total = scrollPosition.value + scrollOffset.value;
+
+            // Tab indices: 0 (Home), 1 (Explore), 2 (Center/Create), 3 (Lists), 4 (Profile)
+            // Pager indices: 0, 1, 2, 3
+            if (total <= 1) {
+                return interpolate(total, [0, 1], [tabPositions.value[0], tabPositions.value[1]]);
+            } else if (total <= 2) {
+                return interpolate(total, [1, 2], [tabPositions.value[1], tabPositions.value[3]]);
+            } else if (total <= 3) {
+                return interpolate(total, [2, 3], [tabPositions.value[3], tabPositions.value[4]]);
             }
         }
-    };
+
+        return withSpring(targetX, SPRING_CONFIG);
+    });
+
 
     const indicatorStyle = useAnimatedStyle(() => ({
         transform: [{ translateX: indicatorX.value }],
-        width: indicatorWidth.value,
-        opacity: indicatorOpacity.value,
+        width: 6,
+        opacity: withTiming(state.routes[state.index].name === 'CreatePlaceholder' ? 0 : 1, { duration: 200 }),
     }));
+
+    const handleTabPress = (index: number, routeName: string) => {
+        // Opacity is now handled automatically by state.index check in useAnimatedStyle
+    };
 
     return (
         <View style={styles.container}>

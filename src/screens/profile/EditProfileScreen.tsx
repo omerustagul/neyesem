@@ -87,8 +87,14 @@ export const EditProfileScreen = ({ navigation }: any) => {
 
     const handleAvatarPick = async () => {
         try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('İzin Gerekli', 'Fotoğraf seçebilmek için galeri erişim izni vermelisiniz.');
+                return;
+            }
+
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                mediaTypes: ['images'],
                 allowsEditing: true,
                 aspect: [1, 1],
                 quality: 0.5,
@@ -378,7 +384,7 @@ const styles = StyleSheet.create({
     backButton: {
         width: 40,
         height: 40,
-        borderRadius: 12,
+        borderRadius: 16,
         borderWidth: 1,
         justifyContent: 'center',
         alignItems: 'center',

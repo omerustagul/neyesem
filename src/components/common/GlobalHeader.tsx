@@ -4,17 +4,15 @@ import { Bell, ChevronLeft } from 'lucide-react-native';
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigationStore } from '../../store/navigationStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
-// Screens that have their own custom header — GlobalHeader hides itself
-const HIDDEN_ON_SCREENS = ['Settings', 'Create', 'EditProfile', 'CreatePlaceholder'];
+// Screens where the GlobalHeader should be visible (Whitelist)
+const SHOW_ON_SCREENS = ['Feed', 'Explore', 'Lists', 'Profile'];
 
 const ROUTE_TITLES: Record<string, string> = {
-    'Notifications': 'Bildirimler',
-    'Appearance': 'Görünüm',
-    'EditProfile': 'Profili Düzenle',
     'Explore': 'Keşfet',
     'Lists': 'Listelerim',
     'Profile': 'Profil',
@@ -38,13 +36,14 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
     const { unreadCount } = useNotificationStore();
 
     // Determine current route name from the root navigator state
-    const currentRouteName = useNavigationState((state) => {
-        const route = state.routes[state.index];
-        return getActiveRouteName(route);
-    });
+    const currentStackRoute = useNavigationState((state) => state?.routes[state.index]?.name);
+    const { activeTab } = useNavigationStore();
 
-    // Hide header on screens with custom headers
-    if (HIDDEN_ON_SCREENS.includes(currentRouteName)) {
+    // Resolve the actual screen name (either stack screen or pager tab)
+    const currentRouteName = currentStackRoute === 'Main' ? activeTab : currentStackRoute;
+
+    // Only show header on specific main screens
+    if (!SHOW_ON_SCREENS.includes(currentRouteName)) {
         return null;
     }
 
@@ -60,11 +59,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
     };
 
     const handleNotificationPress = () => {
-        const parentNav = navigation.getParent();
-        if (parentNav) {
-            parentNav.navigate('Notifications');
-            return;
-        }
         navigation.navigate('Notifications');
     };
 

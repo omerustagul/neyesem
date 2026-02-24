@@ -1,33 +1,55 @@
 import { useNavigation } from '@react-navigation/native';
-import { Bookmark, Lock, Plus, Star } from 'lucide-react-native';
-import React from 'react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { Bookmark, Lock, Plus } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { db } from '../../api/firebase';
 import { GlassCard } from '../../components/glass/GlassCard';
+import { CreateListPopup } from '../../components/lists/CreateListPopup';
+import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
-const LISTS = [
+const DEFAULT_LISTS = [
     {
-        id: 'saved',
-        title: 'Kaydedilenler',
-        subtitle: 'Tüm favoriler',
+        id: 'all',
+        title: 'Tüm Kaydedilenler',
+        subtitle: 'Burası daima seninle',
         icon: Bookmark,
-    },
-    {
-        id: 'favorites',
-        title: 'Favoriler',
-        subtitle: '1 video',
-        icon: Star,
-        locked: true,
-    },
+        type: 'default'
+    }
 ];
 
 export const ListsScreen = () => {
     const { theme, isDark, typography } = useTheme();
+    const { user } = useAuthStore();
     const insets = useSafeAreaInsets();
     const navigation = useNavigation<any>();
+    const [userLists, setUserLists] = useState<any[]>([]);
+    const [isCreateVisible, setIsCreateVisible] = useState(false);
     const headerHeight = 52 + insets.top;
+
+    useEffect(() => {
+        if (!user) return;
+
+        const q = query(
+            collection(db, 'lists'),
+            where('userId', '==', user.uid)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const lists = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setUserLists(lists);
+        });
+
+        return () => unsubscribe();
+    }, [user]);
+
+    const combinedLists = [...DEFAULT_LISTS, ...userLists];
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -41,7 +63,10 @@ export const ListsScreen = () => {
                     <Text style={[styles.title, { color: theme.text, fontFamily: typography.display }]}>
                         Listelerim
                     </Text>
-                    <TouchableOpacity activeOpacity={0.7}>
+                    <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setIsCreateVisible(true)}
+                    >
                         <View style={styles.addButton}>
                             <Plus size={20} color={colors.warmWhite} />
                         </View>
@@ -49,14 +74,19 @@ export const ListsScreen = () => {
                 </View>
 
                 <View style={styles.grid}>
-                    {LISTS.map((list) => {
-                        const Icon = list.icon;
+                    {combinedLists.map((list) => {
+                        const Icon = list.icon || Bookmark;
                         return (
-                            <TouchableOpacity key={list.id} activeOpacity={0.7} style={styles.gridItem}>
+                            <TouchableOpacity
+                                key={list.id}
+                                activeOpacity={0.7}
+                                style={styles.gridItem}
+                                onPress={() => navigation.navigate('ListDetail', { listId: list.id, listTitle: list.title })}
+                            >
                                 <GlassCard style={styles.listCard}>
                                     <View style={styles.cardTopRow}>
                                         <View style={[styles.iconWrap, {
-                                            backgroundColor: isDark ? 'rgba(20,133,74,0.15)' : 'rgba(20,133,74,0.08)',
+                                            backgroundColor: isDark ? 'rgba(255,178,0,0.1)' : 'rgba(255,178,0,0.05)',
                                         }]}>
                                             <Icon size={22} color={colors.saffron} />
                                         </View>
@@ -71,7 +101,7 @@ export const ListsScreen = () => {
                                             {list.title}
                                         </Text>
                                         <Text style={[styles.cardSubtitle, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                                            {list.subtitle}
+                                            {list.type === 'default' ? list.subtitle : `${list.posts_count || 0} içerik`}
                                         </Text>
                                     </View>
                                 </GlassCard>
@@ -80,6 +110,11 @@ export const ListsScreen = () => {
                     })}
                 </View>
             </ScrollView>
+
+            <CreateListPopup
+                visible={isCreateVisible}
+                onClose={() => setIsCreateVisible(false)}
+            />
         </View>
     );
 };
@@ -104,7 +139,7 @@ const styles = StyleSheet.create({
     addButton: {
         width: 38,
         height: 38,
-        borderRadius: 12,
+        borderRadius: 16,
         backgroundColor: colors.saffron,
         alignItems: 'center',
         justifyContent: 'center',
@@ -136,7 +171,7 @@ const styles = StyleSheet.create({
     lockBadge: {
         width: 24,
         height: 24,
-        borderRadius: 8,
+        borderRadius: 12,
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',

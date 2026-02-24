@@ -182,7 +182,7 @@ export const SettingsScreen = ({ navigation }: any) => {
                         icon={Archive}
                         title="Arşiv"
                         subtitle="Arşivlenen gönderiler ve eski hikayeler"
-                        onPress={() => { }}
+                        onPress={() => navigation.navigate('Archive')}
                     />
                 </GlassCard>
 
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     backButton: {
         width: 36,
         height: 36,
-        borderRadius: 12,
+        borderRadius: 16,
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',

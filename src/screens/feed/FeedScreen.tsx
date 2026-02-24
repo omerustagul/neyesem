@@ -1,27 +1,38 @@
-﻿import { doc, onSnapshot } from 'firebase/firestore';
-import { ChefHat, Heart, MessageCircle, Plus, Share2, TrendingUp, User, Utensils } from 'lucide-react-native';
+﻿import { useNavigation } from '@react-navigation/native';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { ChefHat, Plus, TrendingUp, User, Utensils } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
-import { FlatList, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
-import { Post, subscribeToFeedPosts } from '../../api/postService';
-import { EmbedCard } from '../../components/feed/EmbedCard';
+import { Post, subscribeToFollowedFeed, togglePostLike } from '../../api/postService';
+import { Story, subscribeToActiveStories } from '../../api/storyService';
+import { VideoPostCard } from '../../components/feed/VideoPostCard';
+import { CommentsPopup } from '../../components/social/CommentsPopup';
+import { SavePopup } from '../../components/social/SavePopup';
+import { StoryViewer } from '../../components/social/StoryViewer';
 import { useXP } from '../../context/XPContext';
 import { useAuthStore } from '../../store/authStore';
 import { useLevelStore } from '../../store/levelStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
-// Story bar placeholder component
-const StoryBar = () => {
+const StoryBar = ({ stories, onStoryPress }: { stories: Story[], onStoryPress: (userId: string) => void }) => {
     const { theme, typography, isDark } = useTheme();
     const { user } = useAuthStore();
+    const navigation = useNavigation<any>();
 
-    const stories = [
-        { id: 'self', username: 'Sen', isSelf: true },
-        // Real stories will come from Firebase later
-    ];
+    // Group stories by userId and take the latest one for the avatar
+    const groupedStories = stories.reduce((acc: any, story) => {
+        if (!acc[story.userId]) {
+            acc[story.userId] = story;
+        }
+        return acc;
+    }, {});
+
+    const displayStories = Object.values(groupedStories);
+    const hasSelfStory = stories.some(s => s.userId === user?.uid);
 
     return (
         <View style={styles.storyBar}>
@@ -30,19 +41,64 @@ const StoryBar = () => {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.storyBarContent}
             >
-                {stories.map((story) => (
-                    <TouchableOpacity key={story.id} style={styles.storyItem} activeOpacity={0.8}>
+                {/* Self Story Item */}
+                <TouchableOpacity
+                    style={styles.storyItem}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                        if (hasSelfStory) {
+                            onStoryPress(user?.uid || '');
+                        } else {
+                            navigation.navigate('CreateStory');
+                        }
+                    }}
+                >
+                    <View style={[
+                        styles.storyRing,
+                        { borderColor: hasSelfStory ? colors.saffron : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)') },
+                    ]}>
+                        <View style={[styles.storyAvatar, {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                        }]}>
+                            {user?.photoURL ? (
+                                <Image source={{ uri: user.photoURL }} style={styles.avatarImg} />
+                            ) : (
+                                <User size={20} color={theme.secondaryText} />
+                            )}
+                            {!hasSelfStory && (
+                                <View style={styles.plusBadge}>
+                                    <Plus size={12} color="#fff" />
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                    <Text
+                        style={[styles.storyUsername, { color: theme.text, fontFamily: typography.body }]}
+                        numberOfLines={1}
+                    >
+                        Sen
+                    </Text>
+                </TouchableOpacity>
+
+                {/* Other Stories */}
+                {displayStories.filter((s: any) => s.userId !== user?.uid).map((story: any) => (
+                    <TouchableOpacity
+                        key={story.id}
+                        style={styles.storyItem}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                            onStoryPress(story.userId);
+                        }}
+                    >
                         <View style={[
                             styles.storyRing,
-                            story.isSelf
-                                ? { borderColor: theme.border }
-                                : { borderColor: colors.saffron },
+                            { borderColor: colors.saffron },
                         ]}>
                             <View style={[styles.storyAvatar, {
                                 backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
                             }]}>
-                                {story.isSelf ? (
-                                    <Plus size={20} color={colors.saffron} />
+                                {story.avatarUrl ? (
+                                    <Image source={{ uri: story.avatarUrl }} style={styles.avatarImg} />
                                 ) : (
                                     <User size={20} color={theme.secondaryText} />
                                 )}
@@ -58,69 +114,6 @@ const StoryBar = () => {
                 ))}
             </ScrollView>
         </View>
-    );
-};
-
-// Post card component for text/image posts
-const PostCard = ({ post }: { post: Post }) => {
-    const { theme, typography, isDark } = useTheme();
-
-    return (
-        <MotiView
-            from={{ opacity: 0, translateY: 12 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 400 }}
-        >
-            <View style={[styles.postCard, {
-                backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.6)',
-                borderColor: theme.border,
-            }]}>
-                {/* Post header */}
-                <View style={styles.postHeader}>
-                    <View style={[styles.postAvatar, { backgroundColor: `${colors.saffron}20` }]}>
-                        <Text style={{ fontSize: 14 }}>
-                            {post.display_name?.charAt(0)?.toUpperCase() || '?'}
-                        </Text>
-                    </View>
-                    <View style={styles.postHeaderText}>
-                        <Text style={[styles.postUsername, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                            {post.display_name || post.username}
-                        </Text>
-                        <Text style={[styles.postTime, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                            @{post.username}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Post content */}
-                {post.caption && (
-                    <Text style={[styles.postCaption, { color: theme.text, fontFamily: typography.body }]}>
-                        {post.caption}
-                    </Text>
-                )}
-
-                <View style={[styles.postStats, { borderTopColor: theme.border }]}>
-                    <View style={styles.statItem}>
-                        <Heart size={14} color={theme.secondaryText} />
-                        <Text style={[styles.statLabel, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                            {post.likes_count || 0}
-                        </Text>
-                    </View>
-                    <View style={styles.statItem}>
-                        <MessageCircle size={14} color={theme.secondaryText} />
-                        <Text style={[styles.statLabel, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                            {post.comments_count || 0}
-                        </Text>
-                    </View>
-                    <View style={styles.statItem}>
-                        <Share2 size={14} color={theme.secondaryText} />
-                        <Text style={[styles.statLabel, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                            {post.shares_count || 0}
-                        </Text>
-                    </View>
-                </View>
-            </View>
-        </MotiView>
     );
 };
 
@@ -168,42 +161,82 @@ export const FeedScreen = () => {
     const { theme, isDark } = useTheme();
     const insets = useSafeAreaInsets();
     const headerHeight = 52 + insets.top;
+
     const [posts, setPosts] = useState<Post[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    // Popup states
+    const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+    const [activeSavePostId, setActiveSavePostId] = useState<string | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [viewableItems, setViewableItems] = useState<string[]>([]);
 
     const { user } = useAuthStore();
     const { level, updateStats } = useLevelStore();
     const { showLevelUp } = useXP();
 
+    const [followingList, setFollowingList] = useState<string[]>([]);
+    const [activeStories, setActiveStories] = useState<Story[]>([]);
+
+    // Viewer states
+    const [viewerVisible, setViewerVisible] = useState(false);
+    const [initialStoryIndex, setInitialStoryIndex] = useState(0);
+    const [viewerStories, setViewerStories] = useState<Story[]>([]);
+
     useEffect(() => {
         if (!user) return;
 
-        // Sync level store with remote profile data
+        // Listen to profile for following list and level sync
         const unsubProfile = onSnapshot(doc(db, 'profiles', user.uid), (snap) => {
             if (snap.exists()) {
                 const data = snap.data();
-                const oldLevel = getLevelStoreLevel(); // We'll handle level up trigger in the callback or here
-
                 updateStats({
                     level: data.level || 1,
                     xp: data.xp || 0,
                     xp_next_level: data.xp_next_level || 150
                 });
+                setFollowingList(data.following || []);
             }
         });
 
-        // Subscribe to real-time feed posts
-        setIsLoading(true);
-        const unsubscribe = subscribeToFeedPosts((feedPosts) => {
+        return () => unsubProfile();
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        // Subscribe to feed based on following list + own posts
+        const feedUserIds = [...followingList];
+        if (user.uid && !feedUserIds.includes(user.uid)) {
+            feedUserIds.push(user.uid);
+        }
+
+        const unsubscribe = subscribeToFollowedFeed(feedUserIds, (feedPosts) => {
             setPosts(feedPosts);
             setIsLoading(false);
+            setIsRefreshing(false);
         }, 30);
 
+        // Subscribe to active stories
+        const storiesUnsubscribe = subscribeToActiveStories(followingList, user.uid, (stories) => {
+            setActiveStories(stories);
+        });
+
         return () => {
-            unsubProfile();
             unsubscribe();
+            storiesUnsubscribe();
         };
-    }, [user]);
+    }, [user, followingList]);
+
+    const onRefresh = () => {
+        setIsRefreshing(true);
+        // The subscription will automatically update, just reset refresh state after a delay
+        setTimeout(() => setIsRefreshing(false), 1500);
+    };
+
+    const _onViewableItemsChanged = React.useRef(({ viewableItems: vItems }: any) => {
+        setViewableItems(vItems.map((v: any) => v.item.id));
+    }).current;
 
     // Track level changes to show celebration
     const prevLevelRef = React.useRef(level);
@@ -215,22 +248,43 @@ export const FeedScreen = () => {
         prevLevelRef.current = level;
     }, [level]);
 
-    // Helper to get current level from store without subscribe
-    const getLevelStoreLevel = () => useLevelStore.getState().level;
-
-    const renderItem = ({ item }: { item: Post }) => {
-        if (item.content_type === 'embed' && item.content_url) {
-            return (
-                <EmbedCard
-                    url={item.content_url}
-                    user={{ username: item.username, avatar_url: item.avatar_url }}
-                    caption={item.caption}
-                    likes={item.likes_count || 0}
-                    comments={item.comments_count || 0}
-                />
-            );
+    const handleLike = async (postId: string) => {
+        if (!user) return;
+        try {
+            await togglePostLike(postId, user.uid);
+        } catch (error) {
+            console.error('Error liking post:', error);
         }
-        return <PostCard post={item} />;
+    };
+
+    const handleStoryPress = (selectedUserId: string) => {
+        // Find all stories by this user or filter activeStories for this user
+        // Usually story viewers show all friends' stories after the tapped one
+        // For simplicity, let's start with just that user's stories or the whole pool
+        const userStories = activeStories.filter(s => s.userId === selectedUserId);
+        if (userStories.length > 0) {
+            setViewerStories(userStories);
+            setInitialStoryIndex(0);
+            setViewerVisible(true);
+        }
+    };
+
+    const renderItem = ({ item, index }: { item: Post; index: number }) => {
+        const isLiked = item.liked_by?.includes(user?.uid || '');
+        const isVisible = viewableItems.includes(item.id);
+
+        return (
+            <VideoPostCard
+                post={item}
+                isLiked={isLiked}
+                isVisible={isVisible}
+                isMutedOverride={!!activeCommentPostId || !!activeSavePostId}
+                onLike={() => handleLike(item.id)}
+                onComment={() => setActiveCommentPostId(item.id)}
+                onSave={() => setActiveSavePostId(item.id)}
+                onShare={() => { }}
+            />
+        );
     };
 
     const hasContent = posts.length > 0;
@@ -248,18 +302,52 @@ export const FeedScreen = () => {
                     data={posts}
                     keyExtractor={(item) => item.id}
                     renderItem={renderItem}
-                    ListHeaderComponent={<StoryBar />}
+                    ListHeaderComponent={<StoryBar stories={activeStories} onStoryPress={handleStoryPress} />}
                     contentContainerStyle={[styles.listContent, { paddingTop: headerHeight + 16 }]}
                     showsVerticalScrollIndicator={false}
+                    onViewableItemsChanged={_onViewableItemsChanged}
+                    viewabilityConfig={{
+                        itemVisiblePercentThreshold: 50
+                    }}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={onRefresh}
+                            tintColor={colors.saffron}
+                            colors={[colors.saffron]}
+                        />
+                    }
                     bounces={true}
                     alwaysBounceVertical={Platform.OS === 'ios'}
                 />
             ) : (
                 <View style={[styles.emptyWrapper, { paddingTop: headerHeight + 16 }]}>
-                    <StoryBar />
+                    <StoryBar stories={activeStories} onStoryPress={handleStoryPress} />
                     <EmptyFeed />
                 </View>
             )}
+
+            {/* Popups */}
+            {activeCommentPostId && (
+                <CommentsPopup
+                    postId={activeCommentPostId}
+                    onClose={() => setActiveCommentPostId(null)}
+                />
+            )}
+
+            {activeSavePostId && (
+                <SavePopup
+                    postId={activeSavePostId}
+                    onClose={() => setActiveSavePostId(null)}
+                />
+            )}
+
+            <StoryViewer
+                visible={viewerVisible}
+                stories={viewerStories}
+                initialIndex={initialStoryIndex}
+                onClose={() => setViewerVisible(false)}
+            />
         </View>
     );
 };
@@ -348,55 +436,22 @@ const styles = StyleSheet.create({
         fontSize: 11,
         marginTop: 4,
     },
-    // Post card
-    postCard: {
-        marginHorizontal: 16,
-        marginBottom: 14,
-        borderRadius: 18,
-        borderWidth: 1,
-        overflow: 'hidden',
+    avatarImg: {
+        width: 54,
+        height: 54,
+        borderRadius: 27,
     },
-    postHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 14,
-        paddingBottom: 8,
-    },
-    postAvatar: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+    plusBadge: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        backgroundColor: colors.saffron,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        borderWidth: 2,
+        borderColor: '#000',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    postHeaderText: {
-        marginLeft: 10,
-    },
-    postUsername: {
-        fontSize: 14,
-    },
-    postTime: {
-        fontSize: 12,
-    },
-    postCaption: {
-        fontSize: 14,
-        lineHeight: 20,
-        paddingHorizontal: 14,
-        paddingBottom: 12,
-    },
-    postStats: {
-        flexDirection: 'row',
-        gap: 16,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderTopWidth: 1,
-    },
-    statItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-    },
-    statLabel: {
-        fontSize: 13,
     },
 });

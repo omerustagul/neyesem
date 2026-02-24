@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         width: 20,
         height: 20,
-        borderRadius: 10,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 2,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     followBtn: {
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 8,
+        borderRadius: 12,
         marginLeft: 8,
     },
     followBtnText: {

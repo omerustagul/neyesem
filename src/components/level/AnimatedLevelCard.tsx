@@ -94,6 +94,7 @@ interface AnimatedLevelCardProps {
     levelName: string;
     streak?: number;
     weeklyXp?: number;
+    mini?: boolean;
 }
 
 export const AnimatedLevelCard: React.FC<AnimatedLevelCardProps> = ({
@@ -103,6 +104,7 @@ export const AnimatedLevelCard: React.FC<AnimatedLevelCardProps> = ({
     levelName,
     streak = 0,
     weeklyXp = 0,
+    mini = false,
 }) => {
     const { theme, typography, isDark } = useTheme();
     const [showModal, setShowModal] = useState(false);
@@ -137,92 +139,116 @@ export const AnimatedLevelCard: React.FC<AnimatedLevelCardProps> = ({
                 style={styles.container}
             >
                 <TouchableOpacity activeOpacity={0.85} onPress={() => setShowModal(true)}>
-                    <GlassCard>
+                    <GlassCard style={mini ? { paddingVertical: 12, paddingHorizontal: 16 } : undefined}>
                         {/* Gradient overlay based on level */}
                         <View style={[styles.gradientOverlay, {
                             backgroundColor: levelColors.light,
                         }]} />
 
-                        {/* Particle Animation */}
-                        <FloatingParticles color={levelColors.primary} />
+                        {!mini && <FloatingParticles color={levelColors.primary} />}
 
-                        {/* Header: Level label + Badge */}
-                        <View style={styles.header}>
-                            <View style={styles.headerLeft}>
-                                <MotiView
-                                    animate={{ rotate: '360deg' }}
-                                    transition={{ loop: true, duration: 4000, type: 'timing' }}
-                                >
-                                    <Zap color={levelColors.primary} size={14} fill={levelColors.primary} />
-                                </MotiView>
-                                <Text style={[styles.levelLabel, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
-                                    SEVİYE {level}
-                                </Text>
-                            </View>
-                            <Animated.View style={badgeStyle}>
-                                <View style={[styles.badge, { backgroundColor: `${levelColors.primary}20` }]}>
-                                    <Award color={levelColors.primary} size={20} />
+                        {mini ? (
+                            <View style={styles.miniContainer}>
+                                <View style={styles.miniHeader}>
+                                    <View style={[styles.badge, { width: 32, height: 32, backgroundColor: `${levelColors.primary}20` }]}>
+                                        <Award color={levelColors.primary} size={16} />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <Text style={[styles.miniLevelName, { color: levelColors.primary, fontFamily: typography.display }]}>
+                                                {levelName}
+                                            </Text>
+                                            <Text style={[styles.miniLevelLabel, { color: theme.secondaryText, fontFamily: typography.mono }]}>
+                                                Lv.{level}
+                                            </Text>
+                                        </View>
+                                        <View style={{ marginTop: 4 }}>
+                                            <XPBar xp={xp} xpNext={xpNext} />
+                                        </View>
+                                    </View>
                                 </View>
-                            </Animated.View>
-                        </View>
-
-                        {/* Level Name */}
-                        <Text style={[styles.levelName, { color: levelColors.primary, fontFamily: typography.display }]}>
-                            {levelName}
-                        </Text>
-
-                        {/* XP Progress */}
-                        <View style={styles.xpSection}>
-                            <View style={styles.xpLabels}>
-                                <Text style={[styles.xpText, { color: theme.secondaryText, fontFamily: typography.mono }]}>
-                                    {xp.toLocaleString()} / {xpNext.toLocaleString()} XP
-                                </Text>
-                                <Text style={[styles.percentText, { color: levelColors.primary, fontFamily: typography.mono }]}>
-                                    {percent}%
-                                    {nextLevelData && (
-                                        <Text style={{ color: theme.secondaryText, fontSize: 10 }}>
-                                            {' '}→ {nextLevelData.name}
+                            </View>
+                        ) : (
+                            <>
+                                {/* Header: Level label + Badge */}
+                                <View style={styles.header}>
+                                    <View style={styles.headerLeft}>
+                                        <MotiView
+                                            animate={{ rotate: '360deg' }}
+                                            transition={{ loop: true, duration: 4000, type: 'timing' }}
+                                        >
+                                            <Zap color={levelColors.primary} size={14} fill={levelColors.primary} />
+                                        </MotiView>
+                                        <Text style={[styles.levelLabel, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                                            SEVİYE {level}
                                         </Text>
+                                    </View>
+                                    <Animated.View style={badgeStyle}>
+                                        <View style={[styles.badge, { backgroundColor: `${levelColors.primary}20` }]}>
+                                            <Award color={levelColors.primary} size={20} />
+                                        </View>
+                                    </Animated.View>
+                                </View>
+
+                                {/* Level Name */}
+                                <Text style={[styles.levelName, { color: levelColors.primary, fontFamily: typography.display }]}>
+                                    {levelName}
+                                </Text>
+
+                                {/* XP Progress */}
+                                <View style={styles.xpSection}>
+                                    <View style={styles.xpLabels}>
+                                        <Text style={[styles.xpText, { color: theme.secondaryText, fontFamily: typography.mono }]}>
+                                            {xp.toLocaleString()} / {xpNext.toLocaleString()} XP
+                                        </Text>
+                                        <Text style={[styles.percentText, { color: levelColors.primary, fontFamily: typography.mono }]}>
+                                            {percent}%
+                                            {nextLevelData && (
+                                                <Text style={{ color: theme.secondaryText, fontSize: 10 }}>
+                                                    {' '}→ {nextLevelData.name}
+                                                </Text>
+                                            )}
+                                        </Text>
+                                    </View>
+                                    <XPBar xp={xp} xpNext={xpNext} />
+                                </View>
+
+                                {/* Stats Row */}
+                                <View style={styles.statsRow}>
+                                    {streak > 0 && (
+                                        <View style={[styles.statChip, { backgroundColor: `${levelColors.primary}12` }]}>
+                                            <Flame size={14} color={colors.spiceRed} />
+                                            <Text style={[styles.statText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                                {streak} Günlük Seri
+                                            </Text>
+                                        </View>
                                     )}
-                                </Text>
-                            </View>
-                            <XPBar xp={xp} xpNext={xpNext} />
-                        </View>
-
-                        {/* Stats Row */}
-                        <View style={styles.statsRow}>
-                            {streak > 0 && (
-                                <View style={[styles.statChip, { backgroundColor: `${levelColors.primary}12` }]}>
-                                    <Flame size={14} color={colors.spiceRed} />
-                                    <Text style={[styles.statText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                        {streak} Günlük Seri
-                                    </Text>
+                                    {weeklyXp > 0 && (
+                                        <View style={[styles.statChip, { backgroundColor: `${levelColors.primary}12` }]}>
+                                            <Zap size={14} color={levelColors.primary} />
+                                            <Text style={[styles.statText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                                Bu Hafta: +{weeklyXp} XP
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
-                            )}
-                            {weeklyXp > 0 && (
-                                <View style={[styles.statChip, { backgroundColor: `${levelColors.primary}12` }]}>
-                                    <Zap size={14} color={levelColors.primary} />
-                                    <Text style={[styles.statText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                        Bu Hafta: +{weeklyXp} XP
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
 
-                        <View style={styles.actionRow}>
-                            <TouchableOpacity style={[styles.actionButton, { borderColor: theme.border }]}>
-                                <Award size={14} color={theme.text} />
-                                <Text style={[styles.actionText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                    Rozetlerim
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[styles.actionButton, { borderColor: theme.border }]}>
-                                <Trophy size={14} color={theme.text} />
-                                <Text style={[styles.actionText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                    Sıralama
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
+                                <View style={styles.actionRow}>
+                                    <TouchableOpacity style={[styles.actionButton, { borderColor: theme.border }]}>
+                                        <Award size={14} color={theme.text} />
+                                        <Text style={[styles.actionText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                            Rozetlerim
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.actionButton, { borderColor: theme.border }]}>
+                                        <Trophy size={14} color={theme.text} />
+                                        <Text style={[styles.actionText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                            Sıralama
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </>
+                        )}
                     </GlassCard>
                 </TouchableOpacity>
             </MotiView>
@@ -408,7 +434,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 6,
         paddingVertical: 8,
-        borderRadius: 12,
+        borderRadius: 16,
         borderWidth: 1,
     },
     actionText: {
@@ -456,7 +482,7 @@ const styles = StyleSheet.create({
     timelineDot: {
         width: 20,
         height: 20,
-        borderRadius: 10,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1,
@@ -471,7 +497,7 @@ const styles = StyleSheet.create({
         marginLeft: 10,
         paddingVertical: 8,
         paddingHorizontal: 12,
-        borderRadius: 12,
+        borderRadius: 16,
         marginBottom: 8,
     },
     timelineHeader: {
@@ -485,7 +511,7 @@ const styles = StyleSheet.create({
     currentBadge: {
         paddingHorizontal: 8,
         paddingVertical: 2,
-        borderRadius: 8,
+        borderRadius: 12,
     },
     timelineReward: {
         fontSize: 12,
@@ -512,5 +538,18 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    miniContainer: {
+        paddingVertical: 2,
+    },
+    miniHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    miniLevelName: {
+        fontSize: 16,
+    },
+    miniLevelLabel: {
+        fontSize: 12,
     },
 });

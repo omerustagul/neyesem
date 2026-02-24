@@ -1,5 +1,5 @@
 ﻿import { doc, setDoc } from 'firebase/firestore';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Dimensions, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
@@ -33,6 +33,7 @@ export const IntroScreen = ({ navigation }: any) => {
     const insets = useSafeAreaInsets();
     const [currentIndex, setCurrentIndex] = useState(0);
     const { user } = useAuthStore();
+    const flatListRef = useRef<FlatList>(null);
 
     const handleFinish = async () => {
         if (user) {
@@ -67,6 +68,7 @@ export const IntroScreen = ({ navigation }: any) => {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <FlatList
+                ref={flatListRef}
                 data={SLIDES}
                 renderItem={renderItem}
                 horizontal
@@ -100,7 +102,10 @@ export const IntroScreen = ({ navigation }: any) => {
                         if (currentIndex === SLIDES.length - 1) {
                             handleFinish();
                         } else {
-                            handleFinish();
+                            flatListRef.current?.scrollToIndex({
+                                index: currentIndex + 1,
+                                animated: true
+                            });
                         }
                     }}
                     style={{ width: '100%' }}

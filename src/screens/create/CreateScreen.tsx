@@ -1,11 +1,13 @@
 ﻿import * as ImagePicker from 'expo-image-picker';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { doc, getDoc } from 'firebase/firestore';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { ArrowRight, BookOpen, Camera, Link, Lock, Image as LucideImage, Sparkles, X } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { db } from '../../api/firebase';
+import { db, storage } from '../../api/firebase';
 import { createPost } from '../../api/postService';
 import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassCard } from '../../components/glass/GlassCard';
@@ -63,7 +65,7 @@ export const CreateScreen = ({ navigation }: any) => {
             title: 'Hikaye Oluştur',
             desc: '24 saatte kaybolan anlar',
             icon: Sparkles,
-            minLevel: 3,
+            minLevel: 1,
             gradient: ['#8b5cf6', '#7c3aed'],
         },
         {
@@ -81,13 +83,12 @@ export const CreateScreen = ({ navigation }: any) => {
             Alert.alert('Seviye Yetersiz', `Bu özellik için Level ${option.minLevel} gerekli! Seviye atlamak için daha fazla etkileşimde bulun.`);
             return;
         }
-
-        if (option.id === 'post') {
+        if (option.id === 'story') {
+            navigation.navigate('CreateStory');
+        } else if (option.id === 'post') {
             setStep('post_media');
         } else if (option.id === 'embed') {
             setStep('embed_form');
-        } else {
-            Alert.alert('Yakında', 'Hikaye özelliği çok yakında kullanıma açılacak!');
         }
     };
 
@@ -97,7 +98,12 @@ export const CreateScreen = ({ navigation }: any) => {
             return;
         }
 
-        const contentType = step === 'embed_form' ? 'embed' : 'text';
+        let contentType: 'text' | 'image' | 'video' | 'embed' = 'text';
+        if (step === 'embed_form') {
+            contentType = 'embed';
+        } else if (selectedMedia) {
+            contentType = 'video';
+        }
 
         if (contentType === 'embed' && !postUrl.trim()) {
             Alert.alert('Hata', 'Lütfen bir URL girin.');
@@ -115,18 +121,58 @@ export const CreateScreen = ({ navigation }: any) => {
             const displayName = profile.display_name || user.displayName || 'Kullanıcı';
             const avatarUrl = profile.avatar_url || '';
 
+            // Upload video to Firebase Storage
+            let contentUrl: string | undefined = postUrl.trim() || undefined;
+            if (contentType === 'video' && selectedMedia) {
+                try {
+                    const videoResponse = await fetch(selectedMedia);
+                    const videoBlob = await videoResponse.blob();
+                    const videoFilename = `videos/${user.uid}_${Date.now()}.mp4`;
+                    const videoRef = ref(storage, videoFilename);
+                    await uploadBytes(videoRef, videoBlob);
+                    contentUrl = await getDownloadURL(videoRef);
+                } catch (uploadError) {
+                    console.error('Video yüklenemedi:', uploadError);
+                    Alert.alert('Hata', 'Video yüklenirken bir sorun oluştu.');
+                    setIsCreating(false);
+                    return;
+                }
+            }
+
+            // Generate thumbnail for video posts and upload to Storage
+            let thumbnailUrl: string | undefined;
+            if (contentType === 'video' && selectedMedia) {
+                try {
+                    const { uri } = await VideoThumbnails.getThumbnailAsync(selectedMedia, {
+                        time: 1000, // 1 second into the video
+                        quality: 0.7,
+                    });
+
+                    // Upload thumbnail to Firebase Storage
+                    const thumbResponse = await fetch(uri);
+                    const thumbBlob = await thumbResponse.blob();
+                    const thumbFilename = `thumbnails/${user.uid}_${Date.now()}.jpg`;
+                    const thumbRef = ref(storage, thumbFilename);
+                    await uploadBytes(thumbRef, thumbBlob);
+                    thumbnailUrl = await getDownloadURL(thumbRef);
+                } catch (thumbError) {
+                    console.warn('Thumbnail oluşturulamadı:', thumbError);
+                }
+            }
+
             await createPost(
                 user.uid,
                 username,
                 displayName,
                 avatarUrl,
                 postCaption,
-                contentType as 'text' | 'embed',
-                selectedMedia || postUrl.trim() || undefined,
+                contentType,
+                contentUrl,
                 cookingTime,
                 difficulty,
                 calories,
-                protein
+                protein,
+                thumbnailUrl
             );
 
             Alert.alert('Başarılı', 'Gönderiniz yayınlandı!');
@@ -185,8 +231,14 @@ export const CreateScreen = ({ navigation }: any) => {
     };
 
     const pickImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('İzin Gerekli', 'Video seçebilmek için galeri erişim izni vermelisiniz.');
+            return;
+        }
+
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            mediaTypes: ['videos'],
             allowsEditing: true,
             aspect: [9, 16],
             quality: 1,
@@ -199,8 +251,14 @@ export const CreateScreen = ({ navigation }: any) => {
     };
 
     const takeVideo = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('İzin Gerekli', 'Video çekebilmek için kamera izni vermelisiniz.');
+            return;
+        }
+
         const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            mediaTypes: ['videos'],
             allowsEditing: true,
             aspect: [9, 16],
             quality: 1,
@@ -525,7 +583,7 @@ const styles = StyleSheet.create({
     closeBtn: {
         width: 36,
         height: 36,
-        borderRadius: 12,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -566,7 +624,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 8,
         paddingVertical: 2,
-        borderRadius: 8,
+        borderRadius: 12,
     },
     // Form view
     formHeader: {
@@ -590,7 +648,7 @@ const styles = StyleSheet.create({
     },
     captionInput: {
         borderWidth: 1,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 12,
         marginBottom: 20,
         minHeight: 120,
@@ -606,7 +664,7 @@ const styles = StyleSheet.create({
         flex: 1,
         height: 48,
         borderWidth: 1,
-        borderRadius: 12,
+        borderRadius: 16,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -639,7 +697,7 @@ const styles = StyleSheet.create({
     chip: {
         paddingHorizontal: 16,
         paddingVertical: 8,
-        borderRadius: 12,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.1)',
     },

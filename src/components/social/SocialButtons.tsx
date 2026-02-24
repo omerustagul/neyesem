@@ -1,4 +1,4 @@
-import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react-native';
+import { Bookmark, ChefHat, Heart, MessageCircle, Share2 } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -64,13 +64,25 @@ export const CommentButton = ({ count, onPress }: any) => {
     );
 };
 
-export const SaveButton = ({ isSaved, onSave }: any) => {
+export const SaveButton = ({ count, isSaved, onSave }: any) => {
     const { theme } = useTheme();
     return (
         <SocialButton
             icon={<Bookmark color={isSaved ? colors.saffron : theme.text} fill={isSaved ? colors.saffron : 'transparent'} size={24} />}
+            label={count}
             onPress={onSave}
             labelColor={theme.text}
+        />
+    );
+};
+
+export const InfoButton = ({ onPress }: any) => {
+    return (
+        <SocialButton
+            icon={<ChefHat color={colors.saffron} size={24} />}
+            label="Yemek Hakkında?"
+            onPress={onPress}
+            labelColor={colors.saffron}
         />
     );
 };
@@ -79,8 +91,8 @@ export const ShareButton = ({ onShare }: any) => {
     const { theme } = useTheme();
     return (
         <SocialButton
-            icon={<Send color={theme.text} size={24} />}
-            onPress={onShare}
+            icon={<Share2 color={theme.text} size={24} />}
+            onPress={onShare || (() => { })}
             labelColor={theme.text}
         />
     );
