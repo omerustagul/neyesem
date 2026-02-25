@@ -282,10 +282,8 @@ export const CreateScreen = ({ navigation }: any) => {
     const handleAddHashtag = () => {
         const trimmed = hashtagInput.trim();
         if (!trimmed) return;
-
         // Add # if not present
         const hashtag = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
-
         if (!customHashtags.includes(hashtag)) {
             setCustomHashtags([...customHashtags, hashtag]);
         }

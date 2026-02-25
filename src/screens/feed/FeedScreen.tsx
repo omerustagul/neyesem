@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     tipCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
     tipText: { flex: 1, fontSize: 13, lineHeight: 18 },
     storyBar: { paddingVertical: 4 },
-    storyBarContent: { paddingHorizontal: 16, gap: 16 },
+    storyBarContent: { paddingHorizontal: 12, gap: 16 },
     storyItem: { alignItems: 'center', width: 68 },
     storyRing: { width: 78, height: 78, borderRadius: 39, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', position: 'relative' },
     storyAvatar: { width: 68, height: 68, borderRadius: 34 },
