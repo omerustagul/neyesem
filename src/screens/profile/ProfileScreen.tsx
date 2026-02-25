@@ -2,17 +2,15 @@ import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { Camera, Settings, User as UserIcon } from 'lucide-react-native';
+import { Camera, Eye, Settings, User as UserIcon } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Alert, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
-import { PalateProfile, subscribeToPalateProfile } from '../../api/palateService';
 import { Post, subscribeToUserPosts } from '../../api/postService';
 import { Story, subscribeToActiveStories } from '../../api/storyService';
 import { SelectionOption, SelectionPopup } from '../../components/common/SelectionPopup';
 import { AnimatedLevelCard } from '../../components/level/AnimatedLevelCard';
-import { PalateCard } from '../../components/profile/PalateCard';
 import { FollowListPopup } from '../../components/social/FollowListPopup';
 import { StoryViewer } from '../../components/social/StoryViewer';
 import { useAuthStore } from '../../store/authStore';
@@ -36,7 +34,6 @@ export const ProfileScreen = () => {
     const [activeStories, setActiveStories] = useState<Story[]>([]);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
-    const [palate, setPalate] = useState<PalateProfile | null>(null);
     const insets = useSafeAreaInsets();
     const headerHeight = 52 + insets.top;
 
@@ -79,13 +76,13 @@ export const ProfileScreen = () => {
             setActiveStories(stories);
         });
 
-        const palateUnsubscribe = subscribeToPalateProfile(user.uid, setPalate);
+
 
         return () => {
             unsubscribe();
             postsUnsubscribe();
             storiesUnsubscribe();
-            palateUnsubscribe();
+
         };
     }, [user, updateStats]);
 
@@ -149,8 +146,8 @@ export const ProfileScreen = () => {
                     }}
                     activeOpacity={0.8}
                 >
-                    {profile?.avatar_url ? (
-                        <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+                    {profile?.avatar_url || profile?.avatarUrl || profile?.photoURL ? (
+                        <Image source={{ uri: profile.avatar_url || profile.avatarUrl || profile.photoURL }} style={styles.avatarImage} />
                     ) : (
                         <View style={[styles.avatarFallback, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F0F4F1' }]}>
                             <UserIcon color={colors.oliveMuted} size={36} />
@@ -161,7 +158,7 @@ export const ProfileScreen = () => {
                     </View>
                 </TouchableOpacity>
 
-                <Text style={[styles.displayName, { color: theme.text, fontFamily: typography.display }]}>{profile?.display_name || 'Kullanıcı'}</Text>
+                <Text style={[styles.displayName, { color: theme.text, fontFamily: typography.display }]}>{profile?.display_name || profile?.displayName || 'Kullanıcı'}</Text>
                 <Text style={[styles.username, { color: theme.secondaryText, fontFamily: typography.body }]}>@{profile?.username || 'kullanici'}</Text>
 
                 <View style={[styles.statsRow, { borderColor: theme.border }]}>
@@ -180,8 +177,6 @@ export const ProfileScreen = () => {
                 </View>
 
                 <Text style={[styles.bio, { color: theme.secondaryText, fontFamily: typography.body }]}>{profile?.bio || 'Henüz biyografi eklenmedi.'}</Text>
-
-                <PalateCard profile={palate} />
 
                 <AnimatedLevelCard level={level} xp={xp} xpNext={xpNextLevel} levelName={levelName} streak={profile?.streak || 0} weeklyXp={profile?.weekly_xp || 0} />
 
@@ -225,6 +220,7 @@ export const ProfileScreen = () => {
                 options={[
                     ...(activeStories.length > 0 ? [{
                         label: 'Hikayeyi İzle',
+                        icon: <Eye size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
                         onPress: () => {
                             setShowProfileMenu(false);
                             setViewerVisible(true);
@@ -232,6 +228,7 @@ export const ProfileScreen = () => {
                     }] : []),
                     {
                         label: 'Fotoğrafı Değiştir',
+                        icon: <Camera size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
                         onPress: () => {
                             setShowProfileMenu(false);
                             handlePickImage();

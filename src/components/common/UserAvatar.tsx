@@ -1,7 +1,8 @@
+import { Image as ExpoImage } from 'expo-image';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { User } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleSheet, View, ViewStyle } from 'react-native';
 import { db } from '../../api/firebase';
 import { colors } from '../../theme/colors';
 
@@ -27,7 +28,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
 
         const unsub = onSnapshot(doc(db, 'profiles', userId), (snap) => {
             if (snap.exists()) {
-                setAvatarUrl(snap.data().avatar_url || null);
+                const data = snap.data();
+                setAvatarUrl(data.avatar_url || data.avatarUrl || data.photoURL || null);
             }
         });
 
@@ -47,7 +49,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
             style
         ]}>
             {avatarUrl ? (
-                <Image
+                <ExpoImage
                     source={{ uri: avatarUrl }}
                     style={{ width: '100%', height: '100%', borderRadius: size / 2 }}
                 />

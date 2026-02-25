@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     statValue: { fontSize: 18 },
     statLabel: { fontSize: 12, opacity: 0.7 },
     bio: { fontSize: 14, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-    followButton: { width: '100%', height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+    followButton: { width: '100%', height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
     followButtonText: { fontSize: 15 },
     postsSection: { paddingHorizontal: 16, marginTop: 20 },
     sectionTitle: { fontSize: 18, marginBottom: 16 },

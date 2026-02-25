@@ -1,6 +1,6 @@
 import { getFocusedRouteNameFromRoute, useNavigation, useNavigationState } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
-import { Bell, ChevronLeft } from 'lucide-react-native';
+import { Bell, ChevronLeft, Plus } from 'lucide-react-native';
 import React from 'react';
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
 // Screens where the GlobalHeader should be visible (Whitelist)
-const SHOW_ON_SCREENS = ['Feed', 'Explore', 'Lists', 'Profile'];
+const SHOW_ON_SCREENS = ['Feed', 'Explore', 'Pantry', 'Lists', 'Profile'];
 
 const ROUTE_TITLES: Record<string, string> = {
     'Explore': 'Keşfet',
@@ -42,6 +42,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
     // Resolve the actual screen name (either stack screen or pager tab)
     const currentRouteName = currentStackRoute === 'Main' ? activeTab : currentStackRoute;
 
+
     // Only show header on specific main screens
     if (!SHOW_ON_SCREENS.includes(currentRouteName)) {
         return null;
@@ -50,17 +51,17 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
     const displayTitle = title || ROUTE_TITLES[currentRouteName];
 
     const logo = isDark
-        ? require('../../../assets/images/appicon-dark_theme.webp')
-        : require('../../../assets/images/appicon-light_theme.webp');
+        ? require('../../../assets/images/app_n_logo_dark_theme.webp')
+        : require('../../../assets/images/app_n_logo_light_theme.webp');
     const canGoBack = showBack ?? navigation.canGoBack();
     const iconButtonStyle = {
         borderColor: theme.border,
         backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.3)',
     };
-
     const handleNotificationPress = () => {
         navigation.navigate('Notifications');
     };
+
 
     return (
         <View style={styles.outerContainer}>
@@ -80,12 +81,20 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
                 />
                 <View style={styles.content}>
                     <View style={styles.side}>
-                        {canGoBack && (
+                        {canGoBack ? (
                             <TouchableOpacity
                                 onPress={() => navigation.goBack()}
                                 style={[styles.iconButton, iconButtonStyle]}
                             >
                                 <ChevronLeft color={theme.text} size={24} />
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                onPress={() => navigation.navigate('Create')}
+                                style={styles.side}
+                                activeOpacity={0.7}
+                            >
+                                <Plus color="#FFF" size={24} />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -104,6 +113,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
                     </TouchableOpacity>
                 </View>
             </View>
+
         </View>
     );
 };

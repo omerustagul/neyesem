@@ -42,10 +42,18 @@ export const subscribeToActiveStories = (
 
     return onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
         const now = Date.now();
-        const stories = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })) as Story[];
+        const stories = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                userId: data.userId || data.user_id,
+                avatarUrl: data.avatarUrl || data.avatar_url,
+                contentUrl: data.contentUrl || data.content_url,
+                createdAt: data.createdAt || data.created_at,
+                expiresAt: data.expiresAt || data.expires_at
+            } as Story;
+        });
 
         // Filter expired stories and sort by createdAt desc in memory
         const validStories = stories

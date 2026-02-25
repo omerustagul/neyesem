@@ -15,16 +15,16 @@ import { GlassCard } from '../glass/GlassCard';
 import { XPBar } from './XPBar';
 
 const LEVEL_DATA = [
-    { level: 1, name: 'Düz Yiyici', xpRequired: 0, reward: 'Temel Erişim' },
-    { level: 2, name: 'Kaşıkçı', xpRequired: 150, reward: 'Yorum Yapma' },
-    { level: 3, name: 'Ev Aşçısı', xpRequired: 400, reward: 'Liste Oluşturma' },
-    { level: 4, name: 'Usta Çırak', xpRequired: 800, reward: 'Gönderi Paylaşma' },
-    { level: 5, name: 'Sous Chef', xpRequired: 1500, reward: 'Hikaye Paylaşma' },
-    { level: 6, name: 'Şef', xpRequired: 3000, reward: 'Rozet Sistemi' },
-    { level: 7, name: 'Baş Şef', xpRequired: 5000, reward: 'Özel Filtreler' },
-    { level: 8, name: 'Gastronom', xpRequired: 8000, reward: 'Gurme Rozeti' },
-    { level: 9, name: 'Gurme', xpRequired: 12000, reward: 'Profil Efektleri' },
-    { level: 10, name: 'Altın Çatal', xpRequired: 20000, reward: 'Tüm Özellikler' },
+    { level: 1, name: 'Düz Yiyici', xpRequired: 0, reward: 'Keşfet Erişimi', tier: 'Çırak' },
+    { level: 2, name: 'Kaşıkçı', xpRequired: 150, reward: 'Tariflere Yorum Yapma', tier: 'Çırak' },
+    { level: 3, name: 'Ev Aşçısı', xpRequired: 400, reward: 'Kendi Listelerini Oluştur', tier: 'Çırak' },
+    { level: 4, name: 'Usta Çırak', xpRequired: 800, reward: 'Görüntülü Tarif Paylaşma', tier: 'Çırak' },
+    { level: 5, name: 'Sous Chef', xpRequired: 1500, reward: 'Hikaye ve Canlı Yayın', tier: 'Usta' },
+    { level: 6, name: 'Şef', xpRequired: 3000, reward: 'Özel Şef Rozeti', tier: 'Usta' },
+    { level: 7, name: 'Baş Şef', xpRequired: 5000, reward: 'Çırak Eğitim Yetkisi', tier: 'Usta' },
+    { level: 8, name: 'Gastronom', xpRequired: 8000, reward: 'Özel Profil Temaları', tier: 'Usta' },
+    { level: 9, name: 'Gurme', xpRequired: 12000, reward: 'Usta Onaylı Rozet', tier: 'Usta' },
+    { level: 10, name: 'Altın Çatal', xpRequired: 20000, reward: 'Neyesem Elçilik Statüsü', tier: 'Usta' },
 ];
 
 const LEVEL_COLORS: Record<number, { primary: string; secondary: string; light: string }> = {
@@ -184,8 +184,12 @@ export const AnimatedLevelCard: React.FC<AnimatedLevelCardProps> = ({
                                         </Text>
                                     </View>
                                     <Animated.View style={badgeStyle}>
-                                        <View style={[styles.badge, { backgroundColor: `${levelColors.primary}20` }]}>
-                                            <Award color={levelColors.primary} size={20} />
+                                        <View style={[styles.badge, { backgroundColor: level >= 5 ? `${colors.saffron}20` : `${levelColors.primary}20` }]}>
+                                            {level >= 5 ? (
+                                                <Trophy color={colors.saffron} size={20} />
+                                            ) : (
+                                                <Award color={levelColors.primary} size={20} />
+                                            )}
                                         </View>
                                     </Animated.View>
                                 </View>

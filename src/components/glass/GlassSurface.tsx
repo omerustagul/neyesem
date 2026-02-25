@@ -41,6 +41,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
                         borderColor: borderColor ?? theme.border,
                         borderWidth,
                     },
+                    (style as any)?.height || (style as any)?.flex ? { flex: 1 } : {}
                 ]}
             >
                 <BlurView
@@ -48,7 +49,9 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
                     tint={isDark ? 'dark' : 'light'}
                     style={StyleSheet.absoluteFillObject}
                 />
-                <View style={contentStyle}>{children}</View>
+                <View style={[(style as any)?.height || (style as any)?.flex ? { flex: 1 } : {}, contentStyle]}>
+                    {children}
+                </View>
             </View>
         </View>
     );

@@ -1,60 +1,27 @@
-﻿import { formatDistanceToNow } from 'date-fns';
+﻿import { useNavigation } from '@react-navigation/native';
+import { formatDistanceToNow } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { Archive, Bell, CheckCircle, Heart, MessageCircle, Star, UserPlus } from 'lucide-react-native';
+import { Archive, ArrowLeft, Bell, CheckCircle, Heart, MessageCircle, Star, UserPlus } from 'lucide-react-native';
 import React, { useEffect } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuthStore } from '../../store/authStore';
 import { AppNotification, useNotificationStore } from '../../store/notificationStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
-const MOCK_NOTIFICATIONS: AppNotification[] = [
-    {
-        id: '1',
-        type: 'follow',
-        body: 'sizi takip etmeye başladı.',
-        is_read: false,
-        created_at: new Date().toISOString(),
-        recipient_id: '1',
-        sender: { username: 'omerustagul', avatar_url: '' }
-    },
-    {
-        id: '2',
-        type: 'system',
-        body: 'Profil bilgileriniz başarıyla güncellendi.',
-        is_read: true,
-        created_at: new Date(Date.now() - 3600000).toISOString(),
-        recipient_id: '1'
-    },
-    {
-        id: '3',
-        type: 'like',
-        body: 'gönderinizi beğendi.',
-        is_read: false,
-        created_at: new Date(Date.now() - 7200000).toISOString(),
-        recipient_id: '1',
-        sender: { username: 'ceylan_gurme', avatar_url: '' }
-    },
-    {
-        id: '4',
-        type: 'list',
-        body: '"Favori Lezzetler" listeniz başarıyla oluşturuldu.',
-        is_read: true,
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-        recipient_id: '1'
-    }
-];
-
 export const NotificationScreen = () => {
     const { theme, typography, isDark } = useTheme();
-    const { notifications, fetchNotifications, markAsRead } = useNotificationStore();
-    const displayNotifications = notifications.length > 0 ? notifications : MOCK_NOTIFICATIONS;
+    const navigation = useNavigation();
+    const { user } = useAuthStore();
+    const { notifications, setupListener, markAsRead } = useNotificationStore();
     const insets = useSafeAreaInsets();
-    const headerHeight = 52 + insets.top;
 
     useEffect(() => {
-        fetchNotifications();
-    }, []);
+        if (!user) return;
+        const unsubscribe = setupListener(user.uid);
+        return () => unsubscribe();
+    }, [user]);
 
     const getIcon = (type: string) => {
         switch (type) {
@@ -65,6 +32,8 @@ export const NotificationScreen = () => {
             case 'archive': return <Archive size={16} color={theme.secondaryText} />;
             case 'success': return <CheckCircle size={16} color="#22c55e" />;
             case 'list': return <Star size={16} color={colors.saffron} fill={colors.saffron} />;
+            case 'level_up': return <Star size={16} color="#f59e0b" fill="#f59e0b" />;
+            case 'xp_gained': return <Star size={16} color={colors.mintFresh} />;
             default: return <Bell size={16} color={colors.saffron} />;
         }
     };
@@ -94,19 +63,11 @@ export const NotificationScreen = () => {
                             </View>
                         ) : (
                             <View style={styles.avatarWrapper}>
-                                {item.sender?.avatar_url ? (
-                                    <View style={styles.avatar}>
-                                        <Text style={[styles.avatarLabel, { color: theme.text }]}>
-                                            {item.sender?.username?.[0]?.toUpperCase()}
-                                        </Text>
-                                    </View>
-                                ) : (
-                                    <View style={[styles.avatar, { backgroundColor: colors.glassBorder }]}>
-                                        <Text style={[styles.avatarLabel, { color: theme.text }]}>
-                                            {item.sender?.username?.[0]?.toUpperCase()}
-                                        </Text>
-                                    </View>
-                                )}
+                                <View style={[styles.avatar, { backgroundColor: colors.glassBorder }]}>
+                                    <Text style={[styles.avatarLabel, { color: theme.text }]}>
+                                        {item.sender?.username?.[0]?.toUpperCase()}
+                                    </Text>
+                                </View>
                                 <View style={[styles.typeBadge, { backgroundColor: isDark ? theme.surface : '#fff' }]}>
                                     {getIcon(item.type)}
                                 </View>
@@ -144,29 +105,46 @@ export const NotificationScreen = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
+            {/* Custom Header with Back Button */}
+            <View style={[styles.header, { paddingTop: insets.top, borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+                    activeOpacity={0.7}
+                >
+                    <ArrowLeft size={20} color={theme.text} />
+                </TouchableOpacity>
+                <Text style={[styles.headerTitle, { color: theme.text, fontFamily: typography.display }]}>
+                    Bildirimler
+                </Text>
+                <View style={{ width: 40 }} />
+            </View>
+
             <FlatList
-                data={displayNotifications}
+                data={notifications}
                 keyExtractor={(item) => item.id}
                 renderItem={renderNotificationItem}
-                contentContainerStyle={[
-                    styles.listPadding,
-                    { paddingTop: headerHeight + 20 }
-                ]}
+                contentContainerStyle={styles.listPadding}
                 showsVerticalScrollIndicator={false}
                 ListHeaderComponent={
-                    <View style={styles.headerSpacer}>
-                        <Text style={[styles.sectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
-                            SON BİLDİRİMLER
-                        </Text>
-                    </View>
+                    notifications.length > 0 ? (
+                        <View style={styles.headerSpacer}>
+                            <Text style={[styles.sectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                                SON BİLDİRİMLER
+                            </Text>
+                        </View>
+                    ) : null
                 }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
-                        <View style={styles.emptyIconCircle}>
+                        <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
                             <Bell size={32} color={theme.secondaryText} />
                         </View>
-                        <Text style={[styles.emptyText, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
-                            Henüz bir bildiriminiz yok.
+                        <Text style={[styles.emptyTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                            Henüz bildirim yok
+                        </Text>
+                        <Text style={[styles.emptyText, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                            Beğeni, yorum ve takip bildirimleri burada görünecek.
                         </Text>
                     </View>
                 }
@@ -179,9 +157,28 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        fontSize: 18,
+    },
     listPadding: {
         paddingHorizontal: 16,
         paddingBottom: 100,
+        paddingTop: 16,
     },
     headerSpacer: {
         marginBottom: 16,
@@ -231,7 +228,6 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: -2,
         right: -2,
-        backgroundColor: '#fff',
         width: 20,
         height: 20,
         borderRadius: 14,
@@ -281,17 +277,23 @@ const styles = StyleSheet.create({
     emptyContainer: {
         paddingTop: 100,
         alignItems: 'center',
+        paddingHorizontal: 32,
     },
     emptyIconCircle: {
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: 'rgba(128,128,128,0.1)',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 20,
     },
+    emptyTitle: {
+        fontSize: 17,
+        marginBottom: 8,
+    },
     emptyText: {
-        fontSize: 15,
+        fontSize: 14,
+        textAlign: 'center',
+        lineHeight: 20,
     },
 });

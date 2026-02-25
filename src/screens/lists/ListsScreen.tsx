@@ -1,8 +1,9 @@
 import { useNavigation } from '@react-navigation/native';
+import { Image as ExpoImage } from 'expo-image';
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { Bookmark, Lock, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { GlassCard } from '../../components/glass/GlassCard';
@@ -20,6 +21,12 @@ const DEFAULT_LISTS = [
         type: 'default'
     }
 ];
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const GRID_PADDING = 16;
+const GAP = 8;
+// Use percentage-based width for better responsiveness in a 2-column grid
+const CARD_WIDTH_PERCENT = '48.8%';
 
 const ListCard = ({ list, onPress }: any) => {
     const { theme, isDark, typography } = useTheme();
@@ -57,12 +64,16 @@ const ListCard = ({ list, onPress }: any) => {
             style={styles.gridItem}
             onPress={onPress}
         >
-            <GlassCard style={styles.listCard}>
+            <GlassCard
+                style={styles.listCard}
+                contentStyle={styles.listCardContent}
+                borderRadius={20}
+            >
                 {thumbnail && (
-                    <Image
+                    <ExpoImage
                         source={{ uri: thumbnail }}
                         style={[StyleSheet.absoluteFill, { opacity: 0.15, borderRadius: 24 }]}
-                        resizeMode="cover"
+                        contentFit="cover"
                         blurRadius={2}
                     />
                 )}
@@ -78,11 +89,11 @@ const ListCard = ({ list, onPress }: any) => {
                         </View>
                     )}
                 </View>
-                <View>
-                    <Text style={[styles.cardTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                <View style={styles.cardBottom}>
+                    <Text style={[styles.cardTitle, { color: theme.text, fontFamily: typography.bodyMedium }]} numberOfLines={2}>
                         {list.title}
                     </Text>
-                    <Text style={[styles.cardSubtitle, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                    <Text style={[styles.cardSubtitle, { color: theme.secondaryText, fontFamily: typography.body }]} numberOfLines={1}>
                         {list.type === 'default' ? list.subtitle : `${list.postIds?.length || 0} içerik`}
                     </Text>
                 </View>
@@ -136,6 +147,7 @@ export const ListsScreen = () => {
                     <TouchableOpacity
                         activeOpacity={0.7}
                         onPress={() => setIsCreateVisible(true)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                         <View style={styles.addButton}>
                             <Plus size={20} color={colors.warmWhite} />
@@ -144,15 +156,13 @@ export const ListsScreen = () => {
                 </View>
 
                 <View style={styles.grid}>
-                    {combinedLists.map((list) => {
-                        return (
-                            <ListCard
-                                key={list.id}
-                                list={list}
-                                onPress={() => navigation.navigate('ListDetail', { listId: list.id, listTitle: list.title })}
-                            />
-                        );
-                    })}
+                    {combinedLists.map((list) => (
+                        <ListCard
+                            key={list.id}
+                            list={list}
+                            onPress={() => navigation.navigate('ListDetail', { listId: list.id, listTitle: list.title })}
+                        />
+                    ))}
                 </View>
             </ScrollView>
 
@@ -192,15 +202,19 @@ const styles = StyleSheet.create({
     grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        columnGap: 12,
-        rowGap: 12, // Ensure row gap matches column gap
+        gap: GAP,
         marginTop: 8,
     },
     gridItem: {
-        width: (Dimensions.get('window').width - 32 - 12) / 2,
+        width: CARD_WIDTH_PERCENT,
+        aspectRatio: 1,
     },
     listCard: {
-        height: 160,
+        flex: 1,
+    },
+    listCardContent: {
+        flex: 1,
+        padding: 12,
         justifyContent: 'space-between',
     },
     cardTopRow: {
@@ -209,25 +223,31 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     iconWrap: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
+        width: 36,
+        height: 36,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
     },
     lockBadge: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
     },
+    cardBottom: {
+        marginTop: 4,
+    },
     cardTitle: {
-        fontSize: 15,
-        marginBottom: 2,
+        fontSize: 14,
+        lineHeight: 18,
+        fontWeight: '700',
     },
     cardSubtitle: {
-        fontSize: 12,
+        fontSize: 11,
+        opacity: 0.6,
+        marginTop: 2,
     },
 });

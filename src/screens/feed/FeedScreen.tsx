@@ -1,6 +1,6 @@
 ﻿import { useNavigation } from '@react-navigation/native';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { ChefHat, TrendingUp, Utensils } from 'lucide-react-native';
+import { ChefHat, Plus, TrendingUp, Utensils } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -88,6 +88,11 @@ const StoryBar = ({ stories, onStoryPress }: { stories: Story[], onStoryPress: (
                         { borderColor: hasSelfStory ? colors.saffron : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)') },
                     ]}>
                         <UserAvatar userId={user?.uid || ''} size={60} style={styles.storyAvatar} />
+                        {!hasSelfStory && (
+                            <View style={[styles.plusIconContainer, { backgroundColor: colors.saffron, borderColor: isDark ? '#000' : '#fff' }]}>
+                                <Plus size={12} color="#fff" strokeWidth={3} />
+                            </View>
+                        )}
                     </View>
                     <Text style={[styles.storyUsername, { color: theme.text, fontFamily: typography.body }]} numberOfLines={1}>
                         Sen
@@ -326,10 +331,21 @@ const styles = StyleSheet.create({
     tipContainer: { width: '100%', gap: 12 },
     tipCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
     tipText: { flex: 1, fontSize: 13, lineHeight: 18 },
-    storyBar: { paddingVertical: 10 },
-    storyBarContent: { paddingHorizontal: 16, gap: 16 },
+    storyBar: { paddingVertical: 4 },
+    storyBarContent: { paddingHorizontal: 4, gap: 16 },
     storyItem: { alignItems: 'center', width: 68 },
-    storyRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center' },
-    storyAvatar: { width: 54, height: 54, borderRadius: 27 },
+    storyRing: { width: 78, height: 78, borderRadius: 39, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+    storyAvatar: { width: 68, height: 68, borderRadius: 34 },
+    plusIconContainer: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     storyUsername: { fontSize: 11, marginTop: 4 },
 });

@@ -1,14 +1,13 @@
 ﻿import * as ImagePicker from 'expo-image-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { doc, getDoc } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { ArrowRight, BookOpen, Camera, Link, Lock, Image as LucideImage, Sparkles, X } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { db, storage } from '../../api/firebase';
-import { createPost } from '../../api/postService';
+import { db } from '../../api/firebase';
+import { createPost, type FoodCategory } from '../../api/postService';
 import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassCard } from '../../components/glass/GlassCard';
 import { GlassInput } from '../../components/glass/GlassInput';
@@ -37,6 +36,9 @@ export const CreateScreen = ({ navigation }: any) => {
     const [calories, setCalories] = useState(0);
     const [protein, setProtein] = useState('');
     const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+    const [foodCategory, setFoodCategory] = useState<FoodCategory | null>(null);
+    const [hashtagInput, setHashtagInput] = useState('');
+    const [customHashtags, setCustomHashtags] = useState<string[]>([]);
 
     useEffect(() => {
         if (!user) return;
@@ -102,7 +104,9 @@ export const CreateScreen = ({ navigation }: any) => {
         if (step === 'embed_form') {
             contentType = 'embed';
         } else if (selectedMedia) {
-            contentType = 'video';
+            // Determine if it's a video or image based on file extension or media type
+            const isVideo = selectedMedia.toLowerCase().match(/\.(mp4|mov|m4v)$/) || selectedMedia.startsWith('data:video');
+            contentType = isVideo ? 'video' : 'image';
         }
 
         if (contentType === 'embed' && !postUrl.trim()) {
@@ -121,42 +125,90 @@ export const CreateScreen = ({ navigation }: any) => {
             const displayName = profile.display_name || user.displayName || 'Kullanıcı';
             const avatarUrl = profile.avatar_url || '';
 
-            // Upload video to Firebase Storage
+            const cloudName = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dj4jcgbwv';
+
             let contentUrl: string | undefined = postUrl.trim() || undefined;
-            if (contentType === 'video' && selectedMedia) {
+            let thumbnailUrl: string | undefined;
+
+            if ((contentType === 'video' || contentType === 'image') && selectedMedia) {
                 try {
-                    const videoResponse = await fetch(selectedMedia);
-                    const videoBlob = await videoResponse.blob();
-                    const videoFilename = `videos/${user.uid}_${Date.now()}.mp4`;
-                    const videoRef = ref(storage, videoFilename);
-                    await uploadBytes(videoRef, videoBlob);
-                    contentUrl = await getDownloadURL(videoRef);
-                } catch (uploadError) {
-                    console.error('Video yüklenemedi:', uploadError);
-                    Alert.alert('Hata', 'Video yüklenirken bir sorun oluştu.');
+                    // 1. Upload main media to Cloudinary (Signed)
+                    const apiKey = process.env.EXPO_PUBLIC_CLOUDINARY_API_KEY || '954885719674597';
+                    const apiSecret = process.env.EXPO_PUBLIC_CLOUDINARY_API_SECRET || 'IADI9j1XtSo0Du0t7f7F7loC_Y0';
+                    const folder = contentType === 'video' ? 'videos' : 'images';
+                    const timestamp = Math.floor(Date.now() / 1000);
+
+                    // Create signature
+                    const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
+                    const signature = sha1(paramsToSign + apiSecret);
+
+                    const formData = new FormData();
+                    formData.append('file', {
+                        uri: selectedMedia,
+                        type: contentType === 'video' ? 'video/mp4' : 'image/jpeg',
+                        name: `post_${user.uid}_${Date.now()}.${contentType === 'video' ? 'mp4' : 'jpg'}`,
+                    } as any);
+                    formData.append('api_key', apiKey);
+                    formData.append('folder', folder);
+                    formData.append('timestamp', String(timestamp));
+                    formData.append('signature', signature);
+
+                    const response = await fetch(
+                        `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
+                        { method: 'POST', body: formData }
+                    );
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Cloudinary Upload Error:', errorText);
+                        throw new Error(`Yükleme hatası (${response.status}): ${errorText}`);
+                    }
+
+                    const result = await response.json();
+                    contentUrl = result.secure_url;
+
+                    // 2. If video, generate and upload thumbnail
+                    if (contentType === 'video') {
+                        try {
+                            const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(selectedMedia, {
+                                time: 1000,
+                                quality: 0.7,
+                            });
+
+                            const thumbFolder = 'thumbnails';
+                            const thumbTimestamp = Math.floor(Date.now() / 1000);
+                            const thumbParamsToSign = `folder=${thumbFolder}&timestamp=${thumbTimestamp}`;
+                            const thumbSignature = sha1(thumbParamsToSign + apiSecret);
+
+                            const thumbFormData = new FormData();
+                            thumbFormData.append('file', {
+                                uri: thumbUri,
+                                type: 'image/jpeg',
+                                name: `thumb_${user.uid}_${Date.now()}.jpg`,
+                            } as any);
+                            thumbFormData.append('api_key', apiKey);
+                            thumbFormData.append('folder', thumbFolder);
+                            thumbFormData.append('timestamp', String(thumbTimestamp));
+                            thumbFormData.append('signature', thumbSignature);
+
+                            const thumbRes = await fetch(
+                                `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+                                { method: 'POST', body: thumbFormData }
+                            );
+
+                            if (thumbRes.ok) {
+                                const thumbResult = await thumbRes.json();
+                                thumbnailUrl = thumbResult.secure_url;
+                            }
+                        } catch (thumbError) {
+                            console.warn('Thumbnail upload error:', thumbError);
+                        }
+                    }
+                } catch (uploadError: any) {
+                    console.error('Medya yüklenemedi:', uploadError);
+                    Alert.alert('Hata', `Medya yüklenirken bir sorun oluştu: ${uploadError.message}`);
                     setIsCreating(false);
                     return;
-                }
-            }
-
-            // Generate thumbnail for video posts and upload to Storage
-            let thumbnailUrl: string | undefined;
-            if (contentType === 'video' && selectedMedia) {
-                try {
-                    const { uri } = await VideoThumbnails.getThumbnailAsync(selectedMedia, {
-                        time: 1000, // 1 second into the video
-                        quality: 0.7,
-                    });
-
-                    // Upload thumbnail to Firebase Storage
-                    const thumbResponse = await fetch(uri);
-                    const thumbBlob = await thumbResponse.blob();
-                    const thumbFilename = `thumbnails/${user.uid}_${Date.now()}.jpg`;
-                    const thumbRef = ref(storage, thumbFilename);
-                    await uploadBytes(thumbRef, thumbBlob);
-                    thumbnailUrl = await getDownloadURL(thumbRef);
-                } catch (thumbError) {
-                    console.warn('Thumbnail oluşturulamadı:', thumbError);
                 }
             }
 
@@ -175,7 +227,13 @@ export const CreateScreen = ({ navigation }: any) => {
                 calories,
                 protein,
                 thumbnailUrl,
-                tags
+                tags,
+                [],
+                undefined,
+                undefined,
+                undefined,
+                foodCategory || undefined,
+                customHashtags
             );
 
             // Reward XP
@@ -214,7 +272,27 @@ export const CreateScreen = ({ navigation }: any) => {
         setDifficulty('Orta');
         setCalories(0);
         setProtein('');
+        setFoodCategory(null);
+        setHashtagInput('');
+        setCustomHashtags([]);
         setStep('select');
+    };
+
+    const handleAddHashtag = () => {
+        const trimmed = hashtagInput.trim();
+        if (!trimmed) return;
+        
+        // Add # if not present
+        const hashtag = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+        
+        if (!customHashtags.includes(hashtag)) {
+            setCustomHashtags([...customHashtags, hashtag]);
+        }
+        setHashtagInput('');
+    };
+
+    const handleRemoveHashtag = (hashtag: string) => {
+        setCustomHashtags(customHashtags.filter(h => h !== hashtag));
     };
 
     const runAiAnalysis = () => {
@@ -259,10 +337,10 @@ export const CreateScreen = ({ navigation }: any) => {
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['videos'],
+            mediaTypes: ['images', 'videos'],
             allowsEditing: true,
             aspect: [9, 16],
-            quality: 1,
+            quality: 0.4,
         });
 
         if (!result.canceled) {
@@ -279,10 +357,10 @@ export const CreateScreen = ({ navigation }: any) => {
         }
 
         const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ['videos'],
+            mediaTypes: ['images', 'videos'],
             allowsEditing: true,
             aspect: [9, 16],
-            quality: 1,
+            quality: 0.4,
         });
 
         if (!result.canceled) {
@@ -396,6 +474,49 @@ export const CreateScreen = ({ navigation }: any) => {
                                 ))}
                             </View>
 
+                            <Text style={[styles.miniLabel, { marginTop: 24 }]}>YİYECEK KATEGORİSİ</Text>
+                            <View style={styles.chipRow}>
+                                {(['meal', 'dessert', 'snack', 'beverage', 'breakfast', 'appetizer'] as FoodCategory[]).map(cat => (
+                                    <TouchableOpacity
+                                        key={cat}
+                                        style={[styles.chip, foodCategory === cat && { backgroundColor: colors.saffron, borderColor: colors.saffron }]}
+                                        onPress={() => setFoodCategory(cat)}
+                                    >
+                                        <Text style={[styles.chipText, { color: foodCategory === cat ? '#fff' : theme.text }]}>
+                                            {cat === 'meal' ? 'Yemek' : cat === 'dessert' ? 'Tatlı' : cat === 'snack' ? 'Atıştırmalık' : cat === 'beverage' ? 'İçecek' : cat === 'breakfast' ? 'Kahvaltı' : 'Meze'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={[styles.miniLabel, { marginTop: 24 }]}>HASHTAG'LER</Text>
+                            <View style={styles.hashtagContainer}>
+                                <View style={[styles.hashtagInput, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}>
+                                    <TextInput
+                                        style={[styles.hashtagInputField, { color: theme.text, fontFamily: typography.body }]}
+                                        placeholder="#tarif #lezzet"
+                                        placeholderTextColor={theme.secondaryText}
+                                        value={hashtagInput}
+                                        onChangeText={setHashtagInput}
+                                        onSubmitEditing={handleAddHashtag}
+                                        multiline={false}
+                                    />
+                                    <TouchableOpacity onPress={handleAddHashtag} style={[styles.hashtagAddBtn, { backgroundColor: colors.saffron }]}>
+                                        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>+</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={styles.hashtagList}>
+                                    {customHashtags.map((hashtag, idx) => (
+                                        <View key={idx} style={[styles.hashtagTag, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                                            <Text style={[styles.hashtagTagText, { color: theme.text }]}>{hashtag}</Text>
+                                            <TouchableOpacity onPress={() => handleRemoveHashtag(hashtag)}>
+                                                <Text style={[styles.hashtagRemove, { color: colors.spiceRed }]}>×</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+
                             <GlassButton
                                 title="AI Analizi Yap"
                                 style={{ marginTop: 32 }}
@@ -450,7 +571,7 @@ export const CreateScreen = ({ navigation }: any) => {
                                     onPress={handleCreatePost}
                                 />
                                 <TouchableOpacity onPress={() => setStep('post_details')} style={styles.backBtnText}>
-                                    <Text style={{ color: theme.secondaryText }}>Bilgileri Düzenle</Text>
+                                    <Text style={{ color: theme.text }}>Bilgileri Düzenle</Text>
                                 </TouchableOpacity>
                             </MotiView>
                         )}
@@ -739,4 +860,50 @@ const styles = StyleSheet.create({
     aiResultLabel: { fontSize: 10, fontWeight: '900', color: colors.oliveMuted, marginBottom: 2 },
     aiResultValue: { fontSize: 15, fontWeight: 'bold' },
     backBtnText: { marginTop: 20, alignSelf: 'center' },
+    // Hashtag styles
+    hashtagContainer: { marginTop: 12, marginBottom: 20 },
+    hashtagInput: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 48,
+        marginBottom: 12,
+    },
+    hashtagInputField: {
+        flex: 1,
+        fontSize: 14,
+        paddingVertical: 12,
+    },
+    hashtagAddBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    hashtagList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    hashtagTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    hashtagTagText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    hashtagRemove: {
+        fontSize: 20,
+        fontWeight: 'bold',
+    },
 });
+

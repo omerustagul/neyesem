@@ -216,7 +216,12 @@ export const sendPalateSignal = async (
             }
         }
 
-        await updateDoc(profileRef, updates);
+        if (!snap.exists()) {
+            // If it's the first signal for this user, we must set the full initial profile + first updates
+            await setDoc(profileRef, { ...INITIAL_PALATE, ...updates, userId });
+        } else {
+            await updateDoc(profileRef, updates);
+        }
     } catch (error) {
         console.error('Error sending palate signal:', error);
     }

@@ -10,6 +10,12 @@ import {
     JetBrainsMono_400Regular
 } from '@expo-google-fonts/jetbrains-mono';
 import {
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+} from '@expo-google-fonts/montserrat';
+import {
     PlayfairDisplay_700Bold,
     useFonts
 } from '@expo-google-fonts/playfair-display';
@@ -32,13 +38,14 @@ interface ThemeContextType {
     themeMode: ThemeMode;
     setThemeMode: (mode: ThemeMode) => void;
     typography: typeof typography;
+    onReady?: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const THEME_STORAGE_KEY = '@neyesem_theme_mode';
 
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ThemeProvider: React.FC<{ children: React.ReactNode, onReady?: () => void }> = ({ children, onReady }) => {
     const colorScheme = useColorScheme();
     const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
     const [isDark, setIsDark] = useState(colorScheme === 'dark');
@@ -50,6 +57,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         DMSans_700Bold,
         Fraunces_600SemiBold,
         JetBrainsMono_400Regular,
+        Montserrat_400Regular,
+        Montserrat_500Medium,
+        Montserrat_600SemiBold,
+        Montserrat_700Bold,
     });
 
     // Load persisted theme
@@ -85,11 +96,18 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
     };
 
+    // We no longer hide the splash screen here, as we transition to an animated splash in the RootLayout
+    // useEffect(() => {
+    //     if (fontsLoaded || fontError) {
+    //         SplashScreen.hideAsync();
+    //     }
+    // }, [fontsLoaded, fontError]);
+
     useEffect(() => {
         if (fontsLoaded || fontError) {
-            SplashScreen.hideAsync();
+            onReady?.();
         }
-    }, [fontsLoaded, fontError]);
+    }, [fontsLoaded, fontError, onReady]);
 
     if (!fontsLoaded && !fontError) {
         return null;

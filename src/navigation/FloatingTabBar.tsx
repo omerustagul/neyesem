@@ -1,19 +1,34 @@
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
-import { Bookmark, Compass, Home, PlusCircle, User } from 'lucide-react-native';
+import { Bookmark, Compass, Dna, Home, User } from 'lucide-react-native';
 import React, { useCallback } from 'react';
-import { LayoutChangeEvent, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Dimensions, LayoutChangeEvent, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
     interpolate,
     SharedValue,
     useAnimatedStyle,
     useSharedValue,
+    withSpring,
     withTiming
 } from 'react-native-reanimated';
 import { useTheme } from '../theme/ThemeProvider';
 import { colors } from '../theme/colors';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TAB_BAR_WIDTH = SCREEN_WIDTH - 40;
+const TAB_CONTENT_WIDTH = TAB_BAR_WIDTH - 24;
+const TAB_WIDTH = TAB_CONTENT_WIDTH / 5;
+
 const SPRING_CONFIG = { damping: 20, stiffness: 250, mass: 0.8 };
+
+// Estimated initial positions to avoid indicator flickering or disappearing
+const INITIAL_POSITIONS = [
+    12 + TAB_WIDTH * 0.5 - 3,
+    12 + TAB_WIDTH * 1.5 - 3,
+    12 + TAB_WIDTH * 2.5 - 3,
+    12 + TAB_WIDTH * 3.5 - 3,
+    12 + TAB_WIDTH * 4.5 - 3,
+];
 
 interface CustomTabBarProps extends BottomTabBarProps {
     scrollPosition?: SharedValue<number>;
@@ -27,50 +42,57 @@ export const FloatingTabBar: React.FC<CustomTabBarProps> = ({
     scrollOffset
 }) => {
     const { theme, isDark } = useTheme();
-    const tabPositions = useSharedValue<number[]>([0, 0, 0, 0, 0]);
-    const indicatorOpacity = useSharedValue(1);
+    const tabPositions = useSharedValue<number[]>(INITIAL_POSITIONS);
 
     const onTabLayout = useCallback((index: number, event: LayoutChangeEvent) => {
         const { x, width } = event.nativeEvent.layout;
         const centerX = x + width / 2 - 3; // 3 = half of indicator 6
+
+        // Use a worklet-safe update to the array
         const newPositions = [...tabPositions.value];
         newPositions[index] = centerX;
         tabPositions.value = newPositions;
     }, []);
 
     const indicatorStyle = useAnimatedStyle(() => {
-        const index = state.index;
-        const targetX = tabPositions.value[index] || 0;
-        let x = targetX;
+        const activeIndex = state.index;
+        const pos = tabPositions.value;
 
-        // If we have scroll position from PagerView, use it for smooth transitions
+        // Base position from the current measured tab layout
+        let x = pos[activeIndex] || 0;
+
+        // If we have real-time scroll data from PagerView, use it for smooth sliding
         if (scrollPosition && scrollOffset) {
             const total = scrollPosition.value + scrollOffset.value;
 
-            // Pager indices: 0 (Home), 1 (Explore), 2 (Lists), 3 (Profile)
-            // mapped to tab positions: 0, 1, 3, 4
+            // Interpolate between the measured positions based on scroll progress
             if (total <= 1) {
-                x = interpolate(total, [0, 1], [tabPositions.value[0], tabPositions.value[1]]);
+                x = interpolate(total, [0, 1], [pos[0], pos[1]]);
             } else if (total <= 2) {
-                x = interpolate(total, [1, 2], [tabPositions.value[1], tabPositions.value[3]]);
+                x = interpolate(total, [1, 2], [pos[1], pos[2]]);
             } else if (total <= 3) {
-                x = interpolate(total, [2, 3], [tabPositions.value[3], tabPositions.value[4]]);
+                x = interpolate(total, [2, 3], [pos[2], pos[3]]);
+            } else if (total <= 4) {
+                x = interpolate(total, [3, 4], [pos[3], pos[4]]);
+            } else {
+                x = pos[4];
             }
         }
 
-        // Avoid showing indicator if position hasn't been calculated yet (still 0)
-        // except for the first tab (Home)
-        const isReady = x > 0 || index === 0;
+        // Hide indicator if we haven't measured the position yet (except for index 0 which might be 0)
+        const isReady = x > 0 || activeIndex === 0;
 
         return {
-            transform: [{ translateX: x }],
+            transform: [{
+                translateX: withSpring(x, SPRING_CONFIG)
+            }],
             width: 6,
             opacity: withTiming(
-                (state.routes[state.index].name === 'CreatePlaceholder' || !isReady) ? 0 : 1,
-                { duration: 200 }
+                isReady ? 1 : 0,
+                { duration: 240 }
             ),
         };
-    });
+    }, [state.index, scrollPosition, scrollOffset]);
 
     const handleTabPress = (index: number, routeName: string) => {
         // Opacity is now handled automatically by state.index check in useAnimatedStyle
@@ -107,13 +129,7 @@ export const FloatingTabBar: React.FC<CustomTabBarProps> = ({
                             switch (name) {
                                 case 'Feed': return <Home color={color} size={24} />;
                                 case 'Explore': return <Compass color={color} size={24} />;
-                                case 'CreatePlaceholder': return (
-                                    <View style={styles.createButton}>
-                                        <View style={styles.createButtonInner}>
-                                            <PlusCircle color={colors.warmWhite} size={30} />
-                                        </View>
-                                    </View>
-                                );
+                                case 'Pantry': return <Dna color={color} size={24} />;
                                 case 'Lists': return <Bookmark color={color} size={24} />;
                                 case 'Profile': return <User color={color} size={24} />;
                                 default: return null;
@@ -182,32 +198,7 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    createButton: {
-        width: 66,
-        height: 66,
-        borderRadius: 33,
-        alignItems: 'center',
-        justifyContent: 'center',
-        top: -20,
-        borderWidth: 4,
-        borderColor: '#DFF1E7',
-        backgroundColor: 'rgba(20, 133, 74, 0.8)',
-        shadowColor: '#0A6C40',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-        elevation: 8,
-    },
-    createButtonInner: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.35)',
-        backgroundColor: 'rgba(20, 133, 74, 0.7)',
-        alignItems: 'center',
-        justifyContent: 'center',
+        height: '100%',
     },
     indicator: {
         position: 'absolute',

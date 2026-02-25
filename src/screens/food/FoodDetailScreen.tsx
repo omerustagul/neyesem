@@ -1,5 +1,6 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { ResizeMode, Video } from 'expo-av';
+import { Image as ExpoImage } from 'expo-image';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { ArrowLeft, Play, Sparkles } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Dimensions, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -9,6 +10,41 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
 const { width } = Dimensions.get('window');
+
+const RelatedVideoItem = ({ item, navigation }: { item: Post, navigation: any }) => {
+    const player = useVideoPlayer(item.content_url || '', (player: any) => {
+        player.pause();
+    });
+
+    return (
+        <TouchableOpacity
+            style={styles.videoItem}
+            onPress={() => navigation.navigate('Reels', { initialPostId: item.id })}
+        >
+            {item.content_url && (item.content_type === 'video' || item.content_type === 'embed') ? (
+                <VideoView
+                    player={player}
+                    style={styles.gridVideo}
+                    contentFit="cover"
+                    nativeControls={false}
+                />
+            ) : item.content_url && item.content_type === 'image' ? (
+                <ExpoImage
+                    source={{ uri: item.content_url }}
+                    style={styles.gridVideo}
+                    contentFit="cover"
+                />
+            ) : (
+                <View style={[styles.gridVideo, { backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' }]}>
+                    <Play size={24} color="#fff" />
+                </View>
+            )}
+            <View style={styles.videoOverlay}>
+                <Text style={styles.videoUser} numberOfLines={1}>@{item.username}</Text>
+            </View>
+        </TouchableOpacity>
+    );
+};
 
 export const FoodDetailScreen = () => {
     const navigation = useNavigation<any>();
@@ -58,27 +94,7 @@ export const FoodDetailScreen = () => {
     );
 
     const renderVideoItem = ({ item }: { item: Post }) => (
-        <TouchableOpacity
-            style={styles.videoItem}
-            onPress={() => navigation.navigate('Reels', { initialPostId: item.id })}
-        >
-            {item.content_url && item.content_type === 'video' ? (
-                <Video
-                    source={{ uri: item.content_url }}
-                    style={styles.gridVideo}
-                    resizeMode={ResizeMode.COVER}
-                    shouldPlay={false}
-                    isMuted={true}
-                />
-            ) : (
-                <View style={[styles.gridVideo, { backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' }]}>
-                    <Play size={24} color="#fff" />
-                </View>
-            )}
-            <View style={styles.videoOverlay}>
-                <Text style={styles.videoUser} numberOfLines={1}>@{item.username}</Text>
-            </View>
-        </TouchableOpacity>
+        <RelatedVideoItem item={item} navigation={navigation} />
     );
 
     return (

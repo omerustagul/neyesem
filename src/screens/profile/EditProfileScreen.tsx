@@ -1,11 +1,10 @@
 ﻿import * as ImagePicker from 'expo-image-picker';
 import { collection, doc, getDoc, getDocs, increment, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { ArrowLeft, Camera, Image as LucideImage } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { db, storage } from '../../api/firebase';
+import { db } from '../../api/firebase';
 import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassCard } from '../../components/glass/GlassCard';
 import { GlassInput } from '../../components/glass/GlassInput';
@@ -104,15 +103,31 @@ export const EditProfileScreen = ({ navigation }: any) => {
                 setUploadingAvatar(true);
                 const uri = result.assets[0].uri;
 
-                const response = await fetch(uri);
-                const blob = await response.blob();
+                // Upload to Cloudinary instead of Firebase Storage
+                const cloudName = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
+                const uploadPreset = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-                const filename = `avatars/${user?.uid}_${new Date().getTime()}.jpg`;
-                const storageRef = ref(storage, filename);
+                const formData = new FormData();
+                formData.append('file', {
+                    uri,
+                    type: 'image/jpeg',
+                    name: `avatar_${user?.uid}_${Date.now()}.jpg`,
+                } as any);
+                formData.append('upload_preset', uploadPreset || 'neyesem');
+                formData.append('folder', 'avatars');
 
-                await uploadBytes(storageRef, blob);
-                const downloadURL = await getDownloadURL(storageRef);
+                const cloudinaryResponse = await fetch(
+                    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+                    { method: 'POST', body: formData }
+                );
 
+                const cloudinaryData = await cloudinaryResponse.json();
+
+                if (!cloudinaryData.secure_url) {
+                    throw new Error('Cloudinary upload failed');
+                }
+
+                const downloadURL = cloudinaryData.secure_url;
                 setAvatarUrl(downloadURL);
 
                 // Update Firestore directly for immediate feedback

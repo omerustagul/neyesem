@@ -39,7 +39,7 @@ export const useLevelStore = create<LevelState>((set, get) => ({
         level: stats.level,
         xp: stats.xp,
         xpNextLevel: stats.xp_next_level,
-        levelName: LEVEL_NAMES[stats.level] || 'Gurme',
+        levelName: LEVEL_NAMES[stats.level] || 'Altın Çatal',
     }),
     addXP: async (userId, amount, onLevelUp) => {
         const state = get();
@@ -56,7 +56,7 @@ export const useLevelStore = create<LevelState>((set, get) => ({
             leveledUp = true;
         }
 
-        const newLevelName = LEVEL_NAMES[newLevel] || 'Gurme';
+        const newLevelName = LEVEL_NAMES[newLevel] || 'Altın Çatal';
 
         set({
             level: newLevel,

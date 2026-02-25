@@ -1,8 +1,6 @@
-import { BlurView } from 'expo-blur';
 import { AnimatePresence, MotiView } from 'moti';
 import React from 'react';
 import {
-    Dimensions,
     Modal,
     Platform,
     StyleSheet,
@@ -12,14 +10,15 @@ import {
     View
 } from 'react-native';
 import { useTheme } from '../../theme/ThemeProvider';
-import { colors } from '../../theme/colors';
-
-const { height } = Dimensions.get('window');
 
 export interface SelectionOption {
     label: string;
     onPress: () => void;
+    icon?: React.ReactNode | ((color: string) => React.ReactNode);
+    activeIconColor?: string; // Optional: specific color for the icon when active
     type?: 'default' | 'destructive' | 'cancel';
+    half?: boolean;
+    active?: boolean; // If true, option is visually highlighted and non-pressable
 }
 
 interface SelectionPopupProps {
@@ -38,7 +37,73 @@ export const SelectionPopup: React.FC<SelectionPopupProps> = ({
     const { theme, isDark, typography } = useTheme();
 
     const cancelOption = options.find(o => o.type === 'cancel');
-    const otherOptions = options.filter(o => o.type !== 'cancel');
+    const normalOptions = options.filter(o => o.type !== 'cancel' && o.type !== 'destructive');
+    const destructiveOptions = options.filter(o => o.type === 'destructive');
+
+    // Colors
+    const containerBg = isDark ? '#131314ff' : '#FFFFFF';
+    const itemBg = isDark ? 'rgba(35, 35, 35, 0.45)' : 'rgba(0,0,0,0.04)';
+    const activeBg = isDark ? '#14854A' : '#14854A';
+    const textColor = isDark ? '#F5F5F5' : '#1A1A1A';
+    const activeTextColor = isDark ? '#FFFFFF' : '#FFFFFF';
+    const secondaryTextColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)';
+    const cancelBg = isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)';
+    const cancelTextColor = '#EF4444';
+
+    const renderIcon = (option: SelectionOption, color: string) => {
+        if (!option.icon) return null;
+
+        // Use activeIconColor if provided and option is active
+        const iconColor = (option.active && option.activeIconColor) ? option.activeIconColor : color;
+
+        if (typeof option.icon === 'function') {
+            return option.icon(iconColor);
+        }
+        if (React.isValidElement(option.icon)) {
+            return React.cloneElement(option.icon as React.ReactElement<any>, { color: iconColor });
+        }
+        return option.icon;
+    };
+
+    const renderOptionButton = (option: SelectionOption, index: number) => {
+        const isHalf = option.half === true;
+        const isActive = option.active === true;
+        const currentColor = isActive ? activeTextColor : textColor;
+
+        return (
+            <TouchableOpacity
+                key={`option-${index}`}
+                activeOpacity={isActive ? 1 : 0.6}
+                disabled={isActive}
+                onPress={() => {
+                    option.onPress();
+                    onClose();
+                }}
+                style={[
+                    styles.optionButton,
+                    {
+                        backgroundColor: isActive ? activeBg : itemBg,
+                        width: isHalf ? '48.5%' : '100%',
+                    }
+                ]}
+            >
+                {option.icon && (
+                    <View style={styles.optionIcon}>
+                        {renderIcon(option, currentColor)}
+                    </View>
+                )}
+                <Text style={[
+                    styles.optionLabel,
+                    {
+                        color: currentColor,
+                        fontFamily: isActive ? typography.bodyMedium : typography.body,
+                    }
+                ]}>
+                    {option.label}
+                </Text>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <Modal
@@ -58,68 +123,102 @@ export const SelectionPopup: React.FC<SelectionPopupProps> = ({
                             from={{ translateY: 300, opacity: 0 }}
                             animate={{ translateY: 0, opacity: 1 }}
                             exit={{ translateY: 300, opacity: 0 }}
-                            transition={{ type: 'spring', damping: 20, stiffness: 150 }}
-                            style={styles.container}
+                            transition={{
+                                type: 'spring',
+                                damping: 25,
+                                stiffness: 180,
+                                mass: 0.8,
+                            }}
                         >
-                            {/* Main Options Group */}
+                            {/* Main container — anchored to bottom & sides */}
                             <View style={[
-                                styles.group,
-                                { backgroundColor: isDark ? 'rgba(40,40,40,0.85)' : 'rgba(255,255,255,0.85)' },
-                                styles.shadow
+                                styles.mainCard,
+                                { backgroundColor: containerBg },
+                                styles.shadow,
                             ]}>
-                                <BlurView intensity={30} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-
+                                {/* Title */}
                                 {title && (
-                                    <View style={[styles.titleContainer, { borderBottomColor: theme.border }]}>
-                                        <Text style={[styles.title, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
-                                            {title}
-                                        </Text>
-                                    </View>
+                                    <Text style={[
+                                        styles.title,
+                                        {
+                                            color: secondaryTextColor,
+                                            fontFamily: typography.bodyMedium,
+                                        }
+                                    ]}>
+                                        {title.toLocaleUpperCase('tr-TR')}
+                                    </Text>
                                 )}
 
-                                {otherOptions.map((option, index) => (
+                                {/* Options Grid */}
+                                <View style={styles.optionsGrid}>
+                                    {normalOptions.map((option, index) =>
+                                        renderOptionButton(option, index)
+                                    )}
+                                </View>
+
+                                {/* Destructive options */}
+                                {destructiveOptions.map((option, index) => (
                                     <TouchableOpacity
-                                        key={index}
-                                        style={[
-                                            styles.option,
-                                            index !== otherOptions.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: 0.5 }
-                                        ]}
+                                        key={`destructive-${index}`}
+                                        activeOpacity={0.6}
                                         onPress={() => {
                                             option.onPress();
                                             onClose();
                                         }}
+                                        style={[
+                                            styles.optionButton,
+                                            {
+                                                backgroundColor: itemBg,
+                                                width: '100%',
+                                            }
+                                        ]}
                                     >
+                                        {option.icon && (
+                                            <View style={styles.optionIcon}>
+                                                {renderIcon(option, textColor)}
+                                            </View>
+                                        )}
                                         <Text style={[
                                             styles.optionLabel,
                                             {
-                                                color: option.type === 'destructive' ? colors.saffron : theme.text,
-                                                fontFamily: typography.bodyMedium
+                                                color: textColor,
+                                                fontFamily: typography.body,
                                             }
                                         ]}>
                                             {option.label}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
-                            </View>
 
-                            {/* Cancel Option */}
-                            {cancelOption && (
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    style={[
-                                        styles.group,
-                                        styles.cancelGroup,
-                                        { backgroundColor: isDark ? 'rgba(45,45,45,0.95)' : 'rgba(255,255,255,0.95)' },
-                                        styles.shadow
-                                    ]}
-                                    onPress={onClose}
-                                >
-                                    <BlurView intensity={30} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-                                    <Text style={[styles.optionLabel, styles.cancelLabel, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                        {cancelOption.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
+                                {/* Cancel button */}
+                                {cancelOption && (
+                                    <TouchableOpacity
+                                        activeOpacity={0.6}
+                                        onPress={onClose}
+                                        style={[
+                                            styles.cancelButton,
+                                            { backgroundColor: cancelBg }
+                                        ]}
+                                    >
+                                        {cancelOption.icon ? (
+                                            <View style={styles.optionIcon}>
+                                                {renderIcon(cancelOption, cancelTextColor)}
+                                            </View>
+                                        ) : (
+                                            <Text style={[styles.cancelX, { fontFamily: typography.bodyMedium }]}>✕</Text>
+                                        )}
+                                        <Text style={[
+                                            styles.optionLabel,
+                                            {
+                                                color: cancelTextColor,
+                                                fontFamily: typography.bodyMedium,
+                                            }
+                                        ]}>
+                                            {cancelOption.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                         </MotiView>
                     )}
                 </AnimatePresence>
@@ -131,53 +230,73 @@ export const SelectionPopup: React.FC<SelectionPopupProps> = ({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.4)',
+        backgroundColor: 'rgba(0,0,0,0.45)',
         justifyContent: 'flex-end',
-        paddingHorizontal: 10,
-        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
     },
-    container: {
-        width: '100%',
-    },
-    group: {
-        borderRadius: 14,
-        overflow: 'hidden',
-        marginBottom: 8,
+    mainCard: {
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+        paddingTop: 24,
+        paddingHorizontal: 32,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        gap: 10,
     },
     shadow: {
         ...Platform.select({
             ios: {
                 shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 10,
+                shadowOffset: { width: 0, height: -12 },
+                shadowOpacity: 0.3,
+                shadowRadius: 24,
             },
             android: {
-                elevation: 5,
+                elevation: 12,
             },
         }),
     },
-    titleContainer: {
-        padding: 16,
-        alignItems: 'center',
-        borderBottomWidth: 0.5,
-    },
     title: {
-        fontSize: 13,
+        fontSize: 12,
         textAlign: 'center',
+        marginBottom: 8,
+        letterSpacing: 0.5,
     },
-    option: {
-        height: 56,
+    optionsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    optionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        height: 52,
+        borderRadius: 18,
+        paddingHorizontal: 24,
+        gap: 8,
+    },
+    optionIcon: {
+        width: 22,
+        height: 22,
         alignItems: 'center',
         justifyContent: 'center',
     },
     optionLabel: {
-        fontSize: 17,
+        fontSize: 15,
     },
-    cancelGroup: {
-        marginTop: 4,
+    cancelButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        height: 52,
+        borderRadius: 18,
+        paddingHorizontal: 24,
+        gap: 8,
     },
-    cancelLabel: {
-        fontWeight: '600',
+    cancelX: {
+        fontSize: 16,
+        color: '#EF4444',
     },
 });

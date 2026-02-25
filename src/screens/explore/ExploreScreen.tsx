@@ -5,6 +5,7 @@ import { Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Te
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Post } from '../../api/postService';
 import { searchPosts, searchUsers, UserProfile } from '../../api/searchService';
+import { SeasonalCompass } from '../../components/explore/SeasonalCompass';
 import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
 import { GlassCard } from '../../components/glass/GlassCard';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -174,7 +175,7 @@ export const ExploreScreen = () => {
                                             style={styles.postResultItem}
                                             onPress={() => {
                                                 addToHistory(searchQuery);
-                                                navigation.navigate('Reels', { postId: post.id });
+                                                navigation.navigate('Reels', { initialPostId: post.id });
                                             }}
                                         >
                                             {post.content_type === 'video' && post.content_url ? (
@@ -232,6 +233,9 @@ export const ExploreScreen = () => {
                                 </View>
                             </View>
                         )}
+
+                        {/* Seasonal Compass */}
+                        <SeasonalCompass />
 
                         {/* Moods Section */}
                         <Text style={[styles.sectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>

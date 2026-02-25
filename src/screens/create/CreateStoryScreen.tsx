@@ -1,9 +1,8 @@
 import { useIsFocused } from '@react-navigation/native';
-import { ResizeMode, Video } from 'expo-av';
 import { BlurView } from 'expo-blur';
-import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import {
     Camera,
@@ -18,7 +17,7 @@ import {
     X
 } from 'lucide-react-native';
 import { AnimatePresence, MotiView } from 'moti';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -84,7 +83,18 @@ export const CreateStoryScreen = ({ navigation }: any) => {
     const savedRotation = useSharedValue(0);
     const context = useSharedValue({ x: 0, y: 0 });
 
-    const videoRef = useRef<Video>(null);
+    // Initialize expo-video player
+    const player = useVideoPlayer(mediaType === 'video' ? media : '', (player: any) => {
+        player.loop = true;
+    });
+
+    useEffect(() => {
+        if (player && mediaType === 'video' && isFocused) {
+            player.play();
+        } else if (player) {
+            player.pause();
+        }
+    }, [player, mediaType, isFocused]);
 
     const deleteContent = useCallback(() => {
         setTextContent('');
@@ -111,7 +121,7 @@ export const CreateStoryScreen = ({ navigation }: any) => {
             mediaTypes: ['images', 'videos'],
             allowsEditing: true,
             aspect: [9, 16],
-            quality: 0.8,
+            quality: 0.4,
         };
 
         const result = useCamera
@@ -144,26 +154,23 @@ export const CreateStoryScreen = ({ navigation }: any) => {
             const cloudName = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dj4jcgbwv';
             const apiKey = process.env.EXPO_PUBLIC_CLOUDINARY_API_KEY || '954885719674597';
             const apiSecret = process.env.EXPO_PUBLIC_CLOUDINARY_API_SECRET || 'IADI9j1XtSo0Du0t7f7F7loC_Y0';
-
-            const timestamp = Math.round(new Date().getTime() / 1000);
             const folder = 'stories';
+            const timestamp = Math.floor(Date.now() / 1000);
 
-            const signatureStr = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
-            const signature = await Crypto.digestStringAsync(
-                Crypto.CryptoDigestAlgorithm.SHA1,
-                signatureStr
-            );
+            // Create signature for signed upload
+            const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
+            const signature = sha1(paramsToSign + apiSecret);
 
             const formData = new FormData();
             formData.append('file', {
                 uri: media,
                 type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-                name: `upload.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
+                name: `story_${user.uid}_${Date.now()}.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
             } as any);
             formData.append('api_key', apiKey);
-            formData.append('timestamp', timestamp.toString());
-            formData.append('signature', signature);
             formData.append('folder', folder);
+            formData.append('timestamp', String(timestamp));
+            formData.append('signature', signature);
 
             const response = await fetch(
                 `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
@@ -173,13 +180,13 @@ export const CreateStoryScreen = ({ navigation }: any) => {
                 }
             );
 
-            const result = await response.json();
-
             if (!response.ok) {
-                console.error('Cloudinary Error:', result);
-                throw new Error(result.error?.message || 'Yükleme başarısız oldu.');
+                const errorText = await response.text();
+                console.error('Cloudinary Story Upload Error:', errorText);
+                throw new Error(`Cloudinary hatası (${response.status}): ${errorText}`);
             }
 
+            const result = await response.json();
             const contentUrl = result.secure_url;
 
             // 3. Create Story Doc in Firestore
@@ -366,13 +373,10 @@ export const CreateStoryScreen = ({ navigation }: any) => {
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
                 <View style={styles.previewContainer}>
                     {mediaType === 'video' ? (
-                        <Video
-                            ref={videoRef}
-                            source={{ uri: media }}
+                        <VideoView
+                            player={player}
                             style={styles.fullMedia}
-                            resizeMode={ResizeMode.COVER}
-                            shouldPlay={isFocused}
-                            isLooping
+                            contentFit="cover"
                         />
                     ) : (
                         <Image source={{ uri: media }} style={styles.fullMedia} resizeMode="cover" />

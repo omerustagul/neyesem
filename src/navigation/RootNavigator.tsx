@@ -18,8 +18,10 @@ import { NotificationScreen } from '../screens/notification/NotificationScreen';
 import { IntroScreen } from '../screens/onboarding/IntroScreen';
 import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
 import { PublicProfileScreen } from '../screens/profile/PublicProfileScreen';
+import { ActivitiesScreen } from '../screens/settings/ActivitiesScreen';
 import { AppearanceScreen } from '../screens/settings/AppearanceScreen';
 import { ArchiveScreen } from '../screens/settings/ArchiveScreen';
+import { PasswordSecurityScreen } from '../screens/settings/PasswordSecurityScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { useAuthStore } from '../store/authStore';
 import { useNotificationStore } from '../store/notificationStore';
@@ -77,6 +79,8 @@ export const RootNavigator = () => {
         };
     }, [user, setupListener]);
 
+    const { notificationHeight } = useNotification();
+
     // Show loading or splash if checking intro status
     if (user && isIntroSeen === null) {
         return (
@@ -85,8 +89,6 @@ export const RootNavigator = () => {
             </View>
         );
     }
-
-    const { notificationHeight } = useNotification();
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -202,6 +204,20 @@ export const RootNavigator = () => {
                                 <Stack.Screen
                                     name="FoodDetail"
                                     component={FoodDetailScreen}
+                                />
+                                <Stack.Screen
+                                    name="Activities"
+                                    component={ActivitiesScreen}
+                                    options={{
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="PasswordSecurity"
+                                    component={PasswordSecurityScreen}
+                                    options={{
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
                                 />
                             </>
                         )
