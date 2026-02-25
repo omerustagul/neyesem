@@ -48,6 +48,8 @@ export const CreateListPopup: React.FC<CreateListPopupProps> = ({ visible, onClo
             transparent
             animationType="fade"
             onRequestClose={onClose}
+            presentationStyle="overFullScreen"
+            statusBarTranslucent
         >
             <View style={styles.overlay}>
                 <Pressable style={styles.backdrop} onPress={onClose} />
@@ -132,6 +134,7 @@ const styles = StyleSheet.create({
         width: '100%',
         padding: 0,
         overflow: 'hidden',
+        minHeight: 300,
     },
     header: {
         flexDirection: 'row',

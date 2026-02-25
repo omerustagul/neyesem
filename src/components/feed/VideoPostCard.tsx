@@ -1,9 +1,10 @@
 import { useIsFocused, useNavigation } from '@react-navigation/native';
-import { ResizeMode, Video } from 'expo-av';
-import { ChefHat, Flame, Gauge, MoreVertical, Play, Timer } from 'lucide-react-native';
+import { Image as ExpoImage } from 'expo-image';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { Archive, ChefHat, Flame, Gauge, MoreVertical, Pencil, Play, Timer, Trash2 } from 'lucide-react-native';
 import { MotiView } from 'moti';
-import React from 'react';
-import { ActionSheetIOS, Alert, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { sendPalateSignal } from '../../api/palateService';
 import { archivePost, deletePost, Post } from '../../api/postService';
@@ -11,6 +12,7 @@ import { useEmbed } from '../../hooks/useEmbed';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
+import { SelectionPopup } from '../common/SelectionPopup';
 import { UserAvatar } from '../common/UserAvatar';
 import { CommentButton, InfoButton, LikeButton, SaveButton } from '../social/SocialButtons';
 
@@ -42,13 +44,32 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
     const isFocused = useIsFocused();
     const { user } = useAuthStore();
     const { embedHtml, platform, isLoading, error } = useEmbed(post.content_url || '');
-    const [playbackRate, setPlaybackRate] = React.useState(1.0);
-    const [isPaused, setIsPaused] = React.useState(false);
+    const [playbackRate, setPlaybackRate] = useState(1.0);
+    const [isPaused, setIsPaused] = useState(false);
+
+    // Initialize expo-video player
+    const isVideo = post.content_type === 'video' || (!post.content_type && post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$|firebase-storage/i));
+    const player = useVideoPlayer(isVideo ? post.content_url || '' : '', (player: any) => {
+        player.loop = true;
+    });
+
+    useEffect(() => {
+        if (!player) return;
+
+        if (isVisible && isFocused && !isPaused && !isMutedOverride) {
+            player.play();
+        } else {
+            player.pause();
+        }
+
+        player.muted = !isVisible || !isFocused || isPaused || isMutedOverride;
+        player.playbackRate = playbackRate;
+    }, [isVisible, isFocused, isPaused, isMutedOverride, playbackRate, player]);
 
     const isOwner = user?.uid === post.userId;
-    const viewStartTime = React.useRef<number | null>(null);
+    const viewStartTime = useRef<number | null>(null);
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (isVisible && isFocused && !isPaused) {
             viewStartTime.current = Date.now();
         } else if (viewStartTime.current) {
@@ -79,39 +100,11 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
         }
     };
 
+    const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+
     const handleMorePress = () => {
         if (!isOwner) return;
-
-        const options = ['Düzenle', 'Arşivle', 'Sil', 'Vazgeç'];
-        if (Platform.OS === 'ios') {
-            ActionSheetIOS.showActionSheetWithOptions(
-                {
-                    options,
-                    destructiveButtonIndex: 2,
-                    cancelButtonIndex: 3,
-                },
-                (buttonIndex) => {
-                    if (buttonIndex === 0) {
-                        navigation.navigate('EditPost', { post });
-                    } else if (buttonIndex === 1) {
-                        archivePost(post.id);
-                        Alert.alert('Arşivlendi', 'Gönderi arşive taşındı.');
-                    } else if (buttonIndex === 2) {
-                        Alert.alert('Sil', 'Bu gönderiyi silmek istediğine emin misin?', [
-                            { text: 'Vazgeç', style: 'cancel' },
-                            { text: 'Sil', style: 'destructive', onPress: () => deletePost(post.id, post.userId) }
-                        ]);
-                    }
-                }
-            );
-        } else {
-            Alert.alert('Seçenekler', '', [
-                { text: 'Düzenle', onPress: () => navigation.navigate('EditPost', { post }) },
-                { text: 'Arşivle', onPress: () => { archivePost(post.id); Alert.alert('Arşivlendi', 'Gönderi arşive taşındı.'); } },
-                { text: 'Sil', style: 'destructive', onPress: () => deletePost(post.id, post.userId) },
-                { text: 'Vazgeç', style: 'cancel' }
-            ]);
-        }
+        setShowOptionsMenu(true);
     };
 
     const renderMedia = () => {
@@ -167,6 +160,21 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
             );
         }
 
+        if (post.content_type === 'image' || (!post.content_type && post.content_url?.match(/\.(jpg|jpeg|png|webp|gif)$|image/i))) {
+            return (
+                <View style={styles.mediaContainer}>
+                    <ExpoImage
+                        source={{ uri: post.content_url }}
+                        style={styles.image}
+                        contentFit="cover"
+                        transition={300}
+                        placeholder={post.thumbnail_url}
+                    />
+                    <TouchableOpacity style={styles.mediaOverlay} onPress={handlePressMedia} />
+                </View>
+            );
+        }
+
         // Default to video if content_url exists and it's not embed
         return (
             <TouchableOpacity
@@ -176,18 +184,11 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
                 onPressOut={() => setPlaybackRate(1.0)}
                 activeOpacity={0.9}
             >
-                <Video
-                    source={{ uri: post.content_url }}
+                <VideoView
+                    player={player}
                     style={styles.video}
-                    resizeMode={ResizeMode.COVER}
-                    shouldPlay={isVisible && isFocused && !isPaused && !isMutedOverride}
-                    isLooping
-                    isMuted={!isVisible || !isFocused || isPaused || isMutedOverride}
-                    rate={playbackRate}
-                    shouldCorrectPitch={true}
-                    usePoster={!!post.thumbnail_url}
-                    posterSource={post.thumbnail_url ? { uri: post.thumbnail_url } : undefined}
-                    posterStyle={{ resizeMode: 'cover' }}
+                    contentFit="cover"
+                    nativeControls={false}
                 />
                 {playbackRate === 2.0 && (
                     <View style={styles.speedIndicator}>
@@ -289,6 +290,39 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
             )}
 
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+            <SelectionPopup
+                visible={showOptionsMenu}
+                title="Gönderi Seçenekleri"
+                onClose={() => setShowOptionsMenu(false)}
+                options={[
+                    {
+                        label: 'Düzenle',
+                        icon: <Pencil size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        onPress: () => navigation.navigate('EditPost', { post }),
+                    },
+                    {
+                        label: 'Arşivle',
+                        icon: <Archive size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        onPress: () => {
+                            archivePost(post.id);
+                            Alert.alert('Arşivlendi', 'Gönderi arşive taşındı.');
+                        },
+                    },
+                    {
+                        label: 'Sil',
+                        icon: <Trash2 size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        type: 'destructive',
+                        onPress: () => {
+                            Alert.alert('Sil', 'Bu gönderiyi silmek istediğine emin misin?', [
+                                { text: 'Vazgeç', style: 'cancel' },
+                                { text: 'Sil', style: 'destructive', onPress: () => deletePost(post.id, post.userId) },
+                            ]);
+                        },
+                    },
+                    { label: 'İptal', type: 'cancel', onPress: () => { } },
+                ]}
+            />
         </MotiView>
     );
 };
@@ -351,6 +385,10 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     video: {
+        width: '100%',
+        height: '100%',
+    },
+    image: {
         width: '100%',
         height: '100%',
     },

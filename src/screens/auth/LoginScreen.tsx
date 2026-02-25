@@ -199,7 +199,7 @@ export const LoginScreen = ({ navigation }: any) => {
         >
             <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
                 <Image
-                    source={isDark ? require('../../../assets/images/appicon-dark_theme.webp') : require('../../../assets/images/appicon-light_theme.webp')}
+                    source={isDark ? require('../../../assets/images/app_n_logo_dark_theme.webp') : require('../../../assets/images/app_n_logo_light_theme.webp')}
                     style={styles.logo}
                     resizeMode="contain"
                 />

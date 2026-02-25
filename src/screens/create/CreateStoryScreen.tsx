@@ -1,10 +1,10 @@
 import { useIsFocused } from '@react-navigation/native';
-import { ResizeMode, Video } from 'expo-av';
 import { BlurView } from 'expo-blur';
-import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { sha1 } from 'js-sha1';
 import {
     Camera,
     Check,
@@ -18,7 +18,7 @@ import {
     X
 } from 'lucide-react-native';
 import { AnimatePresence, MotiView } from 'moti';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -84,7 +84,18 @@ export const CreateStoryScreen = ({ navigation }: any) => {
     const savedRotation = useSharedValue(0);
     const context = useSharedValue({ x: 0, y: 0 });
 
-    const videoRef = useRef<Video>(null);
+    // Initialize expo-video player
+    const player = useVideoPlayer(mediaType === 'video' ? media : '', (player: any) => {
+        player.loop = true;
+    });
+
+    useEffect(() => {
+        if (player && mediaType === 'video' && isFocused) {
+            player.play();
+        } else if (player) {
+            player.pause();
+        }
+    }, [player, mediaType, isFocused]);
 
     const deleteContent = useCallback(() => {
         setTextContent('');
@@ -111,7 +122,8 @@ export const CreateStoryScreen = ({ navigation }: any) => {
             mediaTypes: ['images', 'videos'],
             allowsEditing: true,
             aspect: [9, 16],
-            quality: 0.8,
+            quality: 0.7,
+            videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality,
         };
 
         const result = useCamera
@@ -144,26 +156,23 @@ export const CreateStoryScreen = ({ navigation }: any) => {
             const cloudName = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dj4jcgbwv';
             const apiKey = process.env.EXPO_PUBLIC_CLOUDINARY_API_KEY || '954885719674597';
             const apiSecret = process.env.EXPO_PUBLIC_CLOUDINARY_API_SECRET || 'IADI9j1XtSo0Du0t7f7F7loC_Y0';
-
-            const timestamp = Math.round(new Date().getTime() / 1000);
             const folder = 'stories';
+            const timestamp = Math.floor(Date.now() / 1000);
 
-            const signatureStr = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
-            const signature = await Crypto.digestStringAsync(
-                Crypto.CryptoDigestAlgorithm.SHA1,
-                signatureStr
-            );
+            // Create signature for signed upload
+            const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
+            const signature = sha1(paramsToSign + apiSecret);
 
             const formData = new FormData();
             formData.append('file', {
                 uri: media,
                 type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-                name: `upload.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
+                name: `story_${user.uid}_${Date.now()}.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
             } as any);
             formData.append('api_key', apiKey);
-            formData.append('timestamp', timestamp.toString());
-            formData.append('signature', signature);
             formData.append('folder', folder);
+            formData.append('timestamp', String(timestamp));
+            formData.append('signature', signature);
 
             const response = await fetch(
                 `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
@@ -173,13 +182,13 @@ export const CreateStoryScreen = ({ navigation }: any) => {
                 }
             );
 
-            const result = await response.json();
-
             if (!response.ok) {
-                console.error('Cloudinary Error:', result);
-                throw new Error(result.error?.message || 'Yükleme başarısız oldu.');
+                const errorText = await response.text();
+                console.error('Cloudinary Story Upload Error:', errorText);
+                throw new Error(`Cloudinary hatası (${response.status}): ${errorText}`);
             }
 
+            const result = await response.json();
             const contentUrl = result.secure_url;
 
             // 3. Create Story Doc in Firestore
@@ -319,17 +328,17 @@ export const CreateStoryScreen = ({ navigation }: any) => {
     if (!media) {
         return (
             <GestureHandlerRootView style={{ flex: 1 }}>
-                <View style={[styles.container, { backgroundColor: '#000' }]}>
+                <View style={[styles.container, { backgroundColor: theme.background }]}>
                     <View style={styles.selectionCenter}>
                         <MotiView
                             from={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             transition={{ type: 'spring' }}
                         >
-                            <Text style={[styles.welcomeTitle, { color: '#fff', fontFamily: typography.display }]}>
+                            <Text style={[styles.welcomeTitle, { color: theme.text, fontFamily: typography.display }]}>
                                 Anını Paylaş
                             </Text>
-                            <Text style={[styles.welcomeSub, { color: 'rgba(255,255,255,0.6)', fontFamily: typography.body }]}>
+                            <Text style={[styles.welcomeSub, { color: theme.secondaryText, fontFamily: typography.body }]}>
                                 Hikayene renk katmak için bir medya seç.
                             </Text>
                         </MotiView>
@@ -339,14 +348,14 @@ export const CreateStoryScreen = ({ navigation }: any) => {
                                 <View style={[styles.iconCircle, { backgroundColor: colors.saffron }]}>
                                     <Camera size={32} color="#fff" />
                                 </View>
-                                <Text style={[styles.pickLabel, { color: '#fff' }]}>Kamera</Text>
+                                <Text style={[styles.pickLabel, { color: theme.text }]}>Kamera</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity style={styles.pickBtn} onPress={() => pickMedia(false)}>
-                                <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                                    <LucideImage size={32} color="#fff" />
+                                <View style={[styles.iconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)' }]}>
+                                    <LucideImage size={32} color={isDark ? "#fff" : theme.text} />
                                 </View>
-                                <Text style={[styles.pickLabel, { color: '#fff' }]}>Galeri</Text>
+                                <Text style={[styles.pickLabel, { color: theme.text }]}>Galeri</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -354,7 +363,7 @@ export const CreateStoryScreen = ({ navigation }: any) => {
                         style={[styles.cancelBtn, { bottom: insets.bottom + 40 }]}
                         onPress={() => navigation.goBack()}
                     >
-                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>Vazgeç</Text>
+                        <Text style={{ color: theme.secondaryText, fontSize: 16 }}>Vazgeç</Text>
                     </TouchableOpacity>
                 </View>
             </GestureHandlerRootView>
@@ -366,13 +375,10 @@ export const CreateStoryScreen = ({ navigation }: any) => {
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
                 <View style={styles.previewContainer}>
                     {mediaType === 'video' ? (
-                        <Video
-                            ref={videoRef}
-                            source={{ uri: media }}
+                        <VideoView
+                            player={player}
                             style={styles.fullMedia}
-                            resizeMode={ResizeMode.COVER}
-                            shouldPlay={isFocused}
-                            isLooping
+                            contentFit="cover"
                         />
                     ) : (
                         <Image source={{ uri: media }} style={styles.fullMedia} resizeMode="cover" />

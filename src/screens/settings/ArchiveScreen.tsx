@@ -1,8 +1,9 @@
 import { useNavigation } from '@react-navigation/native';
+import { Image as ExpoImage } from 'expo-image';
 import { ArrowLeft, Inbox, RefreshCw, Trash2 } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deletePost, Post, subscribeToArchivedPosts, unarchivePost } from '../../api/postService';
 import { useAuthStore } from '../../store/authStore';
@@ -60,7 +61,7 @@ export const ArchiveScreen = () => {
 
     const renderItem = ({ item }: { item: Post }) => (
         <View style={[styles.postItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)', borderColor: theme.border }]}>
-            <Image source={{ uri: item.content_url }} style={styles.postImage} />
+            <ExpoImage source={{ uri: item.thumbnail_url || item.content_url }} style={styles.postImage} contentFit="cover" />
             <View style={styles.postInfo}>
                 <Text style={[styles.postCaption, { color: theme.text, fontFamily: typography.body }]} numberOfLines={2}>
                     {item.caption}
@@ -90,14 +91,17 @@ export const ArchiveScreen = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <View style={[styles.header, { paddingTop: insets.top }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <ArrowLeft color={theme.text} size={24} />
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={[styles.backButton, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}
+                >
+                    <ArrowLeft color={theme.text} size={20} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
                     Arşiv
                 </Text>
-                <View style={{ width: 40 }} />
+                <View style={{ width: 36 }} />
             </View>
 
             {loading ? (
@@ -140,10 +144,14 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingBottom: 12,
-        height: Platform.OS === 'ios' ? 100 : 70,
     },
     backButton: {
-        padding: 8,
+        width: 36,
+        height: 36,
+        borderRadius: 16,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
         fontSize: 18,

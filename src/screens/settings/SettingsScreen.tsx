@@ -8,13 +8,16 @@ import {
     HelpCircle,
     Lock,
     LogOut,
+    Moon,
     Palette,
+    Smartphone,
+    Sun,
     User,
 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
-    ActionSheetIOS,
     Alert,
+    Linking,
     Platform,
     ScrollView,
     StyleSheet,
@@ -24,9 +27,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
+import { SelectionPopup } from '../../components/common/SelectionPopup';
 import { GlassCard } from '../../components/glass/GlassCard';
 import { useAuthStore } from '../../store/authStore';
-import { ThemeMode, useTheme } from '../../theme/ThemeProvider';
+import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
 type ItemProps = {
@@ -72,6 +76,7 @@ export const SettingsScreen = ({ navigation }: any) => {
     const { user, signOut } = useAuthStore();
     const insets = useSafeAreaInsets();
     const [profile, setProfile] = useState<any>(null);
+    const [showThemePopup, setShowThemePopup] = useState(false);
 
     useEffect(() => {
         if (!user) return;
@@ -90,26 +95,7 @@ export const SettingsScreen = ({ navigation }: any) => {
     };
 
     const handleThemeSelect = () => {
-        if (Platform.OS === 'ios') {
-            ActionSheetIOS.showActionSheetWithOptions(
-                {
-                    options: ['İptal', 'Açık Mod', 'Koyu Mod', 'Sistem'],
-                    cancelButtonIndex: 0,
-                    userInterfaceStyle: isDark ? 'dark' : 'light',
-                },
-                (index) => {
-                    const themes: (ThemeMode | null)[] = [null, 'light', 'dark', 'system'];
-                    if (themes[index]) setThemeMode(themes[index]!);
-                }
-            );
-        } else {
-            Alert.alert('Tema Seç', 'Uygulama temasını seçin', [
-                { text: 'Açık Mod', onPress: () => setThemeMode('light') },
-                { text: 'Koyu Mod', onPress: () => setThemeMode('dark') },
-                { text: 'Sistem', onPress: () => setThemeMode('system') },
-                { text: 'İptal', style: 'cancel' },
-            ]);
-        }
+        setShowThemePopup(true);
     };
 
     const handleSignOut = () => {
@@ -166,7 +152,7 @@ export const SettingsScreen = ({ navigation }: any) => {
                         icon={Lock}
                         title="Şifre ve Güvenlik"
                         subtitle="Şifre değiştirme işlemleri"
-                        onPress={() => { }}
+                        onPress={() => navigation.navigate('PasswordSecurity')}
                     />
                 </GlassCard>
 
@@ -176,7 +162,7 @@ export const SettingsScreen = ({ navigation }: any) => {
                         icon={HeartPulse}
                         title="Hareketlerin"
                         subtitle="Yorumlar, beğeniler ve etkileşimler"
-                        onPress={() => { }}
+                        onPress={() => navigation.navigate('Activities')}
                     />
                     <SettingsItem
                         icon={Archive}
@@ -198,7 +184,13 @@ export const SettingsScreen = ({ navigation }: any) => {
                         icon={Bell}
                         title="Bildirimler"
                         subtitle="Uygulama bildirimlerini yönet"
-                        onPress={() => { }}
+                        onPress={() => {
+                            if (Platform.OS === 'ios') {
+                                Linking.openURL('app-settings:');
+                            } else {
+                                Linking.openSettings();
+                            }
+                        }}
                     />
                 </GlassCard>
 
@@ -222,6 +214,17 @@ export const SettingsScreen = ({ navigation }: any) => {
                     </GlassCard>
                 </View>
             </ScrollView>
+
+            <SelectionPopup
+                visible={showThemePopup}
+                options={[
+                    { label: 'Koyu Mod', icon: <Moon size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />, onPress: () => setThemeMode('dark'), half: true, active: themeMode === 'dark' },
+                    { label: 'Açık Mod', icon: <Sun size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />, onPress: () => setThemeMode('light'), half: true, active: themeMode === 'light' },
+                    { label: 'Sistem Varsayılanı', icon: <Smartphone size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />, onPress: () => setThemeMode('system'), active: themeMode === 'system' },
+                    { label: 'İptal', onPress: () => { }, type: 'cancel' },
+                ]}
+                onClose={() => setShowThemePopup(false)}
+            />
         </View>
     );
 };

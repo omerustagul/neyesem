@@ -18,6 +18,8 @@ import { db } from './firebase';
 import { createNotification } from './notificationService';
 import { sendPalateSignal } from './palateService';
 
+export type FoodCategory = 'meal' | 'dessert' | 'snack' | 'beverage' | 'breakfast' | 'appetizer';
+
 export interface Post {
     id: string;
     userId: string;
@@ -42,9 +44,12 @@ export interface Post {
     protein?: string;
     thumbnail_url?: string;
     tags?: string[];
+    ingredients?: string[];
     chainId?: string;
     parentPostId?: string;
     isChainRoot?: boolean;
+    foodCategory?: FoodCategory;
+    hashtags?: string[];
 }
 
 // Create post
@@ -62,9 +67,12 @@ export const createPost = async (
     protein?: string,
     thumbnail_url?: string,
     tags: string[] = [],
+    ingredients: string[] = [],
     chainId?: string,
     parentPostId?: string,
-    isChainRoot?: boolean
+    isChainRoot?: boolean,
+    foodCategory?: FoodCategory,
+    hashtags: string[] = []
 ): Promise<string> => {
     try {
         const postData = {
@@ -81,9 +89,12 @@ export const createPost = async (
             protein: protein || '',
             thumbnail_url: thumbnail_url || '',
             tags,
+            ingredients,
             chainId: chainId || null,
             parentPostId: parentPostId || null,
             isChainRoot: isChainRoot || false,
+            foodCategory: foodCategory || null,
+            hashtags,
             likes_count: 0,
             comments_count: 0,
             shares_count: 0,
@@ -238,20 +249,33 @@ export const subscribeToFollowedFeed = (
         return onSnapshot(
             q,
             (snapshot) => {
-                let posts = snapshot.docs.map(docSnap => ({
-                    id: docSnap.id,
-                    ...docSnap.data(),
-                } as Post));
+                let posts = snapshot.docs.map(docSnap => {
+                    const data = docSnap.data();
+                    return {
+                        id: docSnap.id,
+                        ...data,
+                        // Ensure both field names work
+                        userId: data.userId || data.user_id,
+                        username: data.username || data.author_name,
+                        display_name: data.display_name || data.displayName,
+                        avatar_url: data.avatar_url || data.avatarUrl || data.photoURL,
+                        created_at: data.created_at || data.createdAt
+                    } as Post;
+                });
 
                 // If following someone, filter to only their posts
                 if (userIds && userIds.length > 0) {
-                    posts = posts.filter(p => userIds.includes(p.userId) && p.is_archived !== true);
+                    posts = posts.filter(p => (userIds.includes(p.userId) || userIds.includes((p as any).user_id)) && p.is_archived !== true);
                 } else {
                     posts = posts.filter(p => p.is_archived !== true);
                 }
 
                 // Sort by date desc, limit
-                posts.sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
+                posts.sort((a, b) => {
+                    const timeA = a.created_at?.seconds || a.created_at?.getTime?.() / 1000 || 0;
+                    const timeB = b.created_at?.seconds || b.created_at?.getTime?.() / 1000 || 0;
+                    return timeB - timeA;
+                });
                 callback(posts.slice(0, limitCount));
             },
             (error) => {

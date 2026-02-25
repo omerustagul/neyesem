@@ -1,13 +1,16 @@
 import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
-import { ResizeMode, Video } from 'expo-av';
-import { ArrowLeft, Bookmark, Flame, Gauge, Heart, MessageCircle, MoreVertical, Play, Timer, Volume2, VolumeX } from 'lucide-react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { Archive, ArrowLeft, Bookmark, Flame, Gauge, Heart, MessageCircle, MoreVertical, Pencil, Play, Timer, Trash2, Volume2, VolumeX } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActionSheetIOS, Alert, Dimensions, FlatList, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, FlatList, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import { archivePost, deletePost, Post, subscribeToFeedPosts, togglePostLike } from '../../api/postService';
+import { SelectionPopup } from '../../components/common/SelectionPopup';
 import { UserAvatar } from '../../components/common/UserAvatar';
 import { CommentsPopup } from '../../components/social/CommentsPopup';
 import { SavePopup } from '../../components/social/SavePopup';
+import { useEmbed } from '../../hooks/useEmbed';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
@@ -15,10 +18,9 @@ import { colors } from '../../theme/colors';
 const { width, height } = Dimensions.get('window');
 
 const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, onArchive }: { post: Post; isActive: boolean; onComment: () => void; onSave: () => void; isScreenFocused: boolean; onEdit: () => void; onArchive: () => void }) => {
-    const { theme, typography } = useTheme();
+    const { theme, isDark, typography } = useTheme();
     const { user } = useAuthStore();
     const navigation = useNavigation<any>();
-    const videoRef = useRef<Video>(null);
     const isLiked = post.liked_by?.includes(user?.uid || '');
     const isSaved = post.saved_by?.includes(user?.uid || '');
     const isOwner = user?.uid === post.userId;
@@ -26,51 +28,36 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
     const [isMuted, setIsMuted] = useState(false);
     const [rate, setRate] = useState(1.0);
 
+    // Initialize expo-video player
+    const player = useVideoPlayer(post.content_url || '', (player: any) => {
+        player.loop = true;
+    });
+
     useEffect(() => {
         if (isActive && !isPaused && isScreenFocused) {
-            videoRef.current?.playAsync();
+            player.play();
         } else {
-            videoRef.current?.pauseAsync();
+            player.pause();
         }
-    }, [isActive, isPaused, isScreenFocused]);
+    }, [isActive, isPaused, isScreenFocused, player]);
+
+    useEffect(() => {
+        player.muted = !isScreenFocused || isMuted;
+        player.playbackRate = rate;
+    }, [isScreenFocused, isMuted, rate, player]);
 
     const handleTap = () => {
         setIsPaused(!isPaused);
     };
 
+    const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+
     const handleMorePress = () => {
         if (!isOwner) return;
-
-        const options = ['Düzenle', 'Arşivle', 'Sil', 'Vazgeç'];
-        if (Platform.OS === 'ios') {
-            ActionSheetIOS.showActionSheetWithOptions(
-                {
-                    options,
-                    destructiveButtonIndex: 2,
-                    cancelButtonIndex: 3,
-                },
-                (buttonIndex) => {
-                    if (buttonIndex === 0) {
-                        onEdit();
-                    } else if (buttonIndex === 1) {
-                        onArchive();
-                    } else if (buttonIndex === 2) {
-                        Alert.alert('Sil', 'Bu gönderiyi silmek istediğine emin misin?', [
-                            { text: 'Vazgeç', style: 'cancel' },
-                            { text: 'Sil', style: 'destructive', onPress: () => deletePost(post.id, post.userId) }
-                        ]);
-                    }
-                }
-            );
-        } else {
-            Alert.alert('Seçenekler', '', [
-                { text: 'Düzenle', onPress: onEdit },
-                { text: 'Arşivle', onPress: onArchive },
-                { text: 'Sil', style: 'destructive', onPress: () => deletePost(post.id, post.userId) },
-                { text: 'Vazgeç', style: 'cancel' }
-            ]);
-        }
+        setShowOptionsMenu(true);
     };
+
+    const { embedHtml, isLoading: isEmbedLoading } = useEmbed(post.content_url || '');
 
     return (
         <View style={styles.reelContainer}>
@@ -81,17 +68,40 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                 onLongPress={() => setRate(2.0)}
                 onPressOut={() => setRate(1.0)}
             >
-                {post.content_url ? (
-                    <Video
-                        ref={videoRef}
-                        source={{ uri: post.content_url }}
+                {post.content_type === 'embed' ? (
+                    <View style={styles.video}>
+                        <WebView
+                            originWhitelist={['*']}
+                            source={{
+                                html: `
+                                    <html>
+                                      <head>
+                                        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                                        <style>
+                                          body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; background: #000; height: 100vh; width: 100vw; overflow: hidden; }
+                                          iframe { width: 100% !important; height: 100% !important; border: none !important; }
+                                          .tiktok-embed { margin: 0 !important; width: 100% !important; height: 100% !important; }
+                                        </style>
+                                      </head>
+                                      <body>
+                                        ${embedHtml}
+                                        <script async src="https://www.instagram.com/embed.js"></script>
+                                        <script async src="https://www.tiktok.com/embed.js"></script>
+                                      </body>
+                                    </html>
+                                `
+                            }}
+                            style={{ backgroundColor: '#000' }}
+                            scrollEnabled={false}
+                        />
+                        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleTap} />
+                    </View>
+                ) : post.content_url ? (
+                    <VideoView
+                        player={player}
                         style={styles.video}
-                        resizeMode={ResizeMode.COVER}
-                        shouldPlay={isActive && !isPaused && isScreenFocused}
-                        isLooping
-                        isMuted={!isScreenFocused || isMuted}
-                        rate={rate}
-                        shouldCorrectPitch={true}
+                        contentFit="cover"
+                        nativeControls={false}
                     />
                 ) : (
                     <View style={[styles.video, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
@@ -192,6 +202,38 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                     </TouchableOpacity>
                 </View>
             </View>
+
+            <SelectionPopup
+                visible={showOptionsMenu}
+                title="Gönderi Seçenekleri"
+                onClose={() => setShowOptionsMenu(false)}
+                options={[
+                    {
+                        label: 'Düzenle',
+                        icon: <Pencil size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        onPress: onEdit,
+                    },
+                    {
+                        label: 'Arşivle',
+                        icon: <Archive size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        onPress: () => {
+                            onArchive();
+                        },
+                    },
+                    {
+                        label: 'Sil',
+                        icon: <Trash2 size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        type: 'destructive',
+                        onPress: () => {
+                            Alert.alert('Sil', 'Bu gönderiyi silmek istediğine emin misin?', [
+                                { text: 'Vazgeç', style: 'cancel' },
+                                { text: 'Sil', style: 'destructive', onPress: () => deletePost(post.id, post.userId) },
+                            ]);
+                        },
+                    },
+                    { label: 'İptal', type: 'cancel', onPress: () => { } },
+                ]}
+            />
         </View>
     );
 };
@@ -210,20 +252,27 @@ export const ReelsScreen = () => {
 
     useEffect(() => {
         const unsubscribe = subscribeToFeedPosts((fetchedPosts) => {
-            const videoPosts = fetchedPosts.filter(p => p.content_type === 'video' || p.content_type === 'embed');
+            const videoPosts = fetchedPosts.filter(p =>
+                p.content_type === 'video' ||
+                p.content_type === 'embed' ||
+                (!p.content_type && p.content_url?.match(/\.(mp4|mov|m4v|m3u8)$|firebase-storage/i))
+            );
             setPosts(videoPosts);
 
-            if (route.params?.initialPostId && !isInitialScrollDone) {
-                const index = videoPosts.findIndex(p => p.id === route.params.initialPostId);
+            const targetId = route.params?.initialPostId || route.params?.postId;
+            if (targetId && !isInitialScrollDone) {
+                const index = videoPosts.findIndex(p => p.id === targetId);
                 if (index !== -1) {
                     setActiveIndex(index);
-                    // Scroll will be handled by initialScrollIndex since we use a conditional render
+                    setTimeout(() => {
+                        flatListRef.current?.scrollToIndex({ index, animated: false });
+                    }, 100);
                 }
                 setIsInitialScrollDone(true);
             }
         });
         return () => unsubscribe();
-    }, []);
+    }, [route.params]);
 
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
         if (viewableItems.length > 0) {
@@ -258,7 +307,7 @@ export const ReelsScreen = () => {
                     showsVerticalScrollIndicator={false}
                     onViewableItemsChanged={onViewableItemsChanged}
                     viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
-                    initialScrollIndex={route.params?.initialPostId ? Math.max(0, posts.findIndex(p => p.id === route.params.initialPostId)) : 0}
+                    initialScrollIndex={0}
                     getItemLayout={(data, index) => ({
                         length: height,
                         offset: height * index,

@@ -8,6 +8,7 @@ import { GlobalHeader } from '../components/common/GlobalHeader';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
 import { FeedScreen } from '../screens/feed/FeedScreen';
 import { ListsScreen } from '../screens/lists/ListsScreen';
+import { PantryScreen } from '../screens/pantry/PantryScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { useNavigationStore } from '../store/navigationStore';
 import { useTheme } from '../theme/ThemeProvider';
@@ -20,8 +21,9 @@ const { width } = Dimensions.get('window');
 const ROUTE_MAP: Record<string, number> = {
     'Feed': 0,
     'Explore': 1,
-    'Lists': 2,
-    'Profile': 3
+    'Pantry': 2,
+    'Lists': 3,
+    'Profile': 4
 };
 
 export const TabNavigator = () => {
@@ -33,14 +35,13 @@ export const TabNavigator = () => {
     const [activeIndex, setActiveIndex] = useState(0);
     const { setActiveTab } = useNavigationStore();
 
-    // This state object mimics the one from createBottomTabNavigator
-    // to keep FloatingTabBar compatible
+    // Simplified navigation state for 5 tabs
     const navigationState = {
-        index: activeIndex > 1 ? activeIndex + 1 : activeIndex, // Handle the 'Create' placeholder gap
+        index: activeIndex,
         routes: [
             { key: 'Feed', name: 'Feed' },
             { key: 'Explore', name: 'Explore' },
-            { key: 'CreatePlaceholder', name: 'CreatePlaceholder' },
+            { key: 'Pantry', name: 'Pantry' },
             { key: 'Lists', name: 'Lists' },
             { key: 'Profile', name: 'Profile' }
         ]
@@ -51,7 +52,7 @@ export const TabNavigator = () => {
         setActiveIndex(index);
 
         // Update global navigation store
-        const routeName = (Object.keys(ROUTE_MAP) as ('Feed' | 'Explore' | 'Lists' | 'Profile')[])
+        const routeName = (Object.keys(ROUTE_MAP) as ('Feed' | 'Explore' | 'Pantry' | 'Lists' | 'Profile')[])
             .find(key => ROUTE_MAP[key] === index);
         if (routeName) setActiveTab(routeName);
     };
@@ -64,14 +65,10 @@ export const TabNavigator = () => {
     // Mimic the navigation object passed to FloatingTabBar
     const navigationProxy = {
         navigate: (name: string) => {
-            if (name === 'CreatePlaceholder') {
-                navigation.navigate('Create');
-            } else {
-                const targetIndex = ROUTE_MAP[name];
-                if (targetIndex !== undefined) {
-                    pagerRef.current?.setPage(targetIndex);
-                    setActiveIndex(targetIndex);
-                }
+            const targetIndex = ROUTE_MAP[name];
+            if (targetIndex !== undefined) {
+                pagerRef.current?.setPage(targetIndex);
+                setActiveIndex(targetIndex);
             }
         },
         emit: ({ type }: any) => {
@@ -97,9 +94,12 @@ export const TabNavigator = () => {
                     <ExploreScreen />
                 </View>
                 <View key="2" style={styles.page}>
-                    <ListsScreen />
+                    <PantryScreen />
                 </View>
                 <View key="3" style={styles.page}>
+                    <ListsScreen />
+                </View>
+                <View key="4" style={styles.page}>
                     <ProfileScreen />
                 </View>
             </PagerView>

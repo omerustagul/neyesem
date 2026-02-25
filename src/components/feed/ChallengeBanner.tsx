@@ -83,10 +83,10 @@ export const ChallengeBanner: React.FC<ChallengeBannerProps> = ({ challenge, pro
 
 const styles = StyleSheet.create({
     container: {
-        marginHorizontal: 16,
         marginTop: 12,
         marginBottom: 8,
         padding: 16,
+        borderRadius: 0,
     },
     header: {
         flexDirection: 'row',
