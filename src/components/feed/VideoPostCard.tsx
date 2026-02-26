@@ -2,12 +2,14 @@ import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { Image as ExpoImage } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Archive, ChefHat, Flame, Gauge, MoreVertical, Pencil, Play, Timer, Trash2 } from 'lucide-react-native';
+import { useLevelStore } from '../../store/levelStore';
+import { useAuthStore } from '../../store/authStore';
 import { MotiView } from 'moti';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { sendPalateSignal } from '../../api/palateService';
-import { archivePost, deletePost, Post } from '../../api/postService';
+import { archivePost, deletePost, Post, savePostForUser } from '../../api/postService';
 import { useEmbed } from '../../hooks/useEmbed';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -43,6 +45,10 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
     const navigation = useNavigation<any>();
     const isFocused = useIsFocused();
     const { user } = useAuthStore();
+    const { addXP } = useLevelStore();
+    const handleLikeWithXP = () => { onLike?.(); if (user?.uid) addXP(user.uid, 1); };
+    const handleCommentWithXP = () => { onComment?.(); if (user?.uid) addXP(user.uid, 3); };
+    const handleSaveWithXP = () => { onSave?.(); if (user?.uid) addXP(user.uid, 1); };
     const { embedHtml, platform, isLoading, error } = useEmbed(post.content_url || '');
     const [playbackRate, setPlaybackRate] = useState(1.0);
     const [isPaused, setIsPaused] = useState(false);
@@ -255,9 +261,9 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
                     <InfoButton onPress={() => navigation.navigate('FoodDetail', { post })} />
                 </View>
                 <View style={styles.rightActions}>
-                    <LikeButton count={post.likes_count} isLiked={isLiked} onLike={onLike} />
-                    <CommentButton count={post.comments_count} onPress={onComment} />
-                    <SaveButton count={post.saves_count || 0} isSaved={post.saved_by?.includes(user?.uid || '')} onSave={onSave} />
+                    <LikeButton count={post.likes_count} isLiked={isLiked} onLike={handleLikeWithXP} />
+                    <CommentButton count={post.comments_count} onPress={handleCommentWithXP} />
+                    <SaveButton count={post.saves_count || 0} isSaved={post.saved_by?.includes(user?.uid || '')} onSave={handleSaveWithXP} />
                 </View>
             </View>
 
@@ -474,4 +480,3 @@ const styles = StyleSheet.create({
         opacity: 0.3,
     },
 });
-

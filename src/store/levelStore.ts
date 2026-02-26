@@ -1,4 +1,9 @@
 import { doc, updateDoc } from 'firebase/firestore';
+import { createNotification } from '../api/notificationService';
+// Level cap configuration
+const MAX_LEVEL = 10;
+const MAX_XP = 5000;
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 import { create } from 'zustand';
 import { db } from '../api/firebase';
 
@@ -35,12 +40,15 @@ export const useLevelStore = create<LevelState>((set, get) => ({
     xp: 0,
     xpNextLevel: 150,
     levelName: 'Düz Yiyici',
-    updateStats: (stats) => set({
-        level: stats.level,
-        xp: stats.xp,
-        xpNextLevel: stats.xp_next_level,
-        levelName: LEVEL_NAMES[stats.level] || 'Altın Çatal',
-    }),
+    updateStats: (stats) => {
+        let lvl = stats.level;
+        let xp = stats.xp;
+        let xpNext = stats.xp_next_level;
+        if (lvl > MAX_LEVEL) lvl = MAX_LEVEL;
+        if (xp > MAX_XP) xp = MAX_XP;
+        if (xpNext > MAX_XP) xpNext = MAX_XP;
+        set({ level: lvl, xp: xp, xpNextLevel: xpNext, levelName: LEVEL_NAMES[lvl] || 'Altın Çatal' });
+    },
     addXP: async (userId, amount, onLevelUp) => {
         const state = get();
         let newXP = state.xp + amount;
@@ -48,12 +56,19 @@ export const useLevelStore = create<LevelState>((set, get) => ({
         let newXPNext = state.xpNextLevel;
         let leveledUp = false;
 
-        // Level up logic
-        while (newXP >= newXPNext) {
+        // Level up logic with cap at MAX_LEVEL
+        while (newXP >= newXPNext && newLevel < MAX_LEVEL) {
             newXP -= newXPNext;
             newLevel += 1;
             newXPNext = calculateNextXP(newLevel);
             leveledUp = true;
+        }
+        if (newLevel >= MAX_LEVEL) {
+            newLevel = MAX_LEVEL;
+            newXP = Math.min(newXP, MAX_XP);
+            newXPNext = MAX_XP;
+        } else {
+            newXP = Math.min(newXP, MAX_XP);
         }
 
         const newLevelName = LEVEL_NAMES[newLevel] || 'Altın Çatal';
@@ -69,6 +84,20 @@ export const useLevelStore = create<LevelState>((set, get) => ({
             onLevelUp(newLevel, newLevelName);
         }
 
+        // XP gain notification (optional)
+        if (amount > 0 && userId) {
+            try {
+                await createNotification({
+                    recipient_id: userId,
+                    type: 'xp_gained',
+                    body: `+${amount} XP`,
+                    is_read: false,
+                    created_at: new Date().toISOString()
+                } as any);
+            } catch {
+                // ignore
+            }
+        }
         // Sync to database
         try {
             await updateDoc(doc(db, 'profiles', userId), {

@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import { Clock, Coffee, Globe, Leaf, MapPin, Search, Sparkles, User, UtensilsCrossed, Wine, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Post } from '../../api/postService';
 import { searchPosts, searchUsers, UserProfile } from '../../api/searchService';
@@ -74,7 +74,7 @@ export const ExploreScreen = () => {
     }, []);
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={[styles.container, { backgroundColor: theme.background }]}> 
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 16 }]}
                 showsVerticalScrollIndicator={false}
@@ -298,6 +298,11 @@ export const ExploreScreen = () => {
                     </>
                 )}
             </ScrollView>
+            {isRefreshing && (
+                <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', pointerEvents: 'none', zIndex: 9999 }]}>
+                    <ActivityIndicator color={colors.saffron} />
+                </View>
+            )}
         </View>
     );
 };

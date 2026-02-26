@@ -301,7 +301,11 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
     };
 
     const handleOptionsPress = () => {
+        // Pause video immediately when options are opened to stop both video and audio
         setIsPaused(true);
+        if (player && typeof player.pause === 'function') {
+            try { player.pause(); } catch { /* ignore */ }
+        }
         setShowOptions(true);
     };
 
@@ -628,9 +632,15 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
                             visible={showOptions}
                             title="Hikaye Seçenekleri"
                             options={storyOptions}
-                            onClose={() => {
+                        onClose={() => {
+                                // Close options and resume playback
                                 setShowOptions(false);
                                 setIsPaused(false);
+                                try {
+                                    if (player && typeof player.play === 'function') {
+                                        player.play();
+                                    }
+                                } catch { /* ignore */ }
                             }}
                         />
                     </View>

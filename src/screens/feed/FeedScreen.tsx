@@ -3,7 +3,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { ChefHat, Plus, TrendingUp, Utensils } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
-import { FlatList, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Challenge, UserChallengeProgress, subscribeToGlobalChallenge, subscribeToUserChallengeProgress } from '../../api/challengeService';
 import { db } from '../../api/firebase';
@@ -168,6 +168,7 @@ export const FeedScreen = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [viewableItems, setViewableItems] = useState<string[]>([]);
     const [followingList, setFollowingList] = useState<string[]>([]);
+    // global refresh hook (defined for future use)
     const [activeStories, setActiveStories] = useState<Story[]>([]);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [initialStoryIndex, setInitialStoryIndex] = useState(0);
@@ -176,6 +177,10 @@ export const FeedScreen = () => {
     const [challengeProgress, setChallengeProgress] = useState<UserChallengeProgress | null>(null);
 
     const seenPostIdsRef = React.useRef<Set<string>>(new Set());
+    const [refreshSignal, setRefreshSignal] = useState(0);
+    // Global refresh hook available for future use (not wired up yet)
+    // const { register } = useGlobalRefresh();
+    const [globalRefreshTick, setGlobalRefreshTick] = useState(0);
     const isPageActive = activeTab === 'Feed';
 
     useEffect(() => {
@@ -224,10 +229,12 @@ export const FeedScreen = () => {
             unsubscribe();
             storiesUnsubscribe();
         };
-    }, [user, followingList]);
+    }, [user, followingList, refreshSignal]);
 
     const onRefresh = () => {
+        console.log('Feed refresh triggered');
         setIsRefreshing(true);
+        setRefreshSignal((r) => r + 1);
         setPosts(prev => [...prev].sort((a, b) => {
             const aSeen = seenPostIdsRef.current.has(a.id);
             const bSeen = seenPostIdsRef.current.has(b.id);
@@ -286,6 +293,11 @@ export const FeedScreen = () => {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
+            {isRefreshing && (
+              <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', pointerEvents: 'none', zIndex: 9999 }]}> 
+                <ActivityIndicator color={colors.saffron} />
+              </View>
+            )}
             {posts.length > 0 ? (
                 <FlatList
                     data={posts}
@@ -301,7 +313,9 @@ export const FeedScreen = () => {
                     showsVerticalScrollIndicator={false}
                     onViewableItemsChanged={_onViewableItemsChanged}
                     viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
-                    refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.saffron} colors={[colors.saffron]} />}
+                    refreshControl={
+                        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.saffron} colors={[colors.saffron]} />
+                    }
                     bounces={true}
                     alwaysBounceVertical={Platform.OS === 'ios'}
                 />

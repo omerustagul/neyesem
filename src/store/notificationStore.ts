@@ -18,6 +18,10 @@ export interface AppNotification {
         username: string;
         avatar_url: string;
     };
+    // Optional fields to support richer navigation
+    sender_id?: string;
+    postId?: string;
+    post_id?: string;
 }
 
 interface NotificationState {

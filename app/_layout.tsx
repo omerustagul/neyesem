@@ -1,4 +1,5 @@
 import { NotificationProvider } from '@/src/context/NotificationContext';
+import { GlobalRefreshProvider } from '@/src/context/GlobalRefreshContext';
 import { XPProvider } from '@/src/context/XPContext';
 import { RootNavigator } from '@/src/navigation/RootNavigator';
 import { SplashAnimationScreen } from '@/src/screens/SplashAnimationScreen';
@@ -36,18 +37,20 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PaperProvider>
-        <ThemeProvider onReady={handleFontsReady}>
-          {!isAnimationComplete ? (
-            <SplashAnimationScreen onAnimationComplete={handleAnimationComplete} />
-          ) : (
-            <NotificationProvider>
-              <XPProvider>
-                <RootNavigator />
-                <StatusBar style="auto" />
-              </XPProvider>
-            </NotificationProvider>
-          )}
-        </ThemeProvider>
+        <GlobalRefreshProvider>
+          <ThemeProvider onReady={handleFontsReady}>
+            {!isAnimationComplete ? (
+              <SplashAnimationScreen onAnimationComplete={handleAnimationComplete} />
+            ) : (
+              <NotificationProvider>
+                <XPProvider>
+                  <RootNavigator />
+                  <StatusBar style="auto" />
+                </XPProvider>
+              </NotificationProvider>
+            )}
+          </ThemeProvider>
+        </GlobalRefreshProvider>
       </PaperProvider>
     </GestureHandlerRootView>
   );

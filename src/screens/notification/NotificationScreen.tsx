@@ -1,18 +1,19 @@
-﻿import { useNavigation } from '@react-navigation/native';
-import { formatDistanceToNow } from 'date-fns';
+import { useNavigation } from '@react-navigation/native';
+import { formatDistanceToNow as _formatDistanceToNow } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { Archive, ArrowLeft, Bell, CheckCircle, Heart, MessageCircle, Star, UserPlus } from 'lucide-react-native';
 import React, { useEffect } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/authStore';
 import { AppNotification, useNotificationStore } from '../../store/notificationStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
+import { followUser } from '../../api/followService';
 
 export const NotificationScreen = () => {
     const { theme, typography, isDark } = useTheme();
-    const navigation = useNavigation();
+    const navigation: any = useNavigation();
     const { user } = useAuthStore();
     const { notifications, setupListener, markAsRead } = useNotificationStore();
     const insets = useSafeAreaInsets();
@@ -38,6 +39,25 @@ export const NotificationScreen = () => {
         }
     };
 
+    const safeFormatTime = (ts: any) => {
+        if (!ts) return '';
+        try {
+            const d = ts.toDate ? ts.toDate() : (typeof ts === 'number' ? new Date(ts) : new Date(ts));
+            if (isNaN(d.getTime())) return '';
+            return _formatDistanceToNow(d, { locale: tr, addSuffix: true }).replace('yaklaşık ', '');
+        } catch {
+            return '';
+        }
+    };
+
+    // Auto-mark all unread notifications as read when loaded
+    useEffect(() => {
+        if (!notifications || notifications.length === 0) return;
+        notifications.filter(n => !n.is_read && n.id).forEach(n => {
+            markAsRead(n.id).catch(() => {});
+        });
+    }, [notifications]);
+
     const renderNotificationItem = ({ item }: { item: AppNotification }) => {
         const isSystem = item.type === 'system' || !item.sender;
         const isFollow = item.type === 'follow';
@@ -52,7 +72,17 @@ export const NotificationScreen = () => {
                         borderWidth: 1,
                     },
                 ]}
-                onPress={() => markAsRead(item.id)}
+                onPress={async () => {
+                    const notifId = (item as any).id || (item as any).notification_id;
+                    await markAsRead(notifId);
+                    const pid = (item as any).postId ?? (item as any).post_id ?? null;
+                    const sid = (item as any).sender_id ?? null;
+                    if (pid) {
+                        navigation.navigate('Reels', { initialPostId: pid } as any);
+                    } else if (sid) {
+                        navigation.navigate('PublicProfile', { userId: sid } as any);
+                    }
+                }}
                 activeOpacity={0.8}
             >
                 <View style={styles.contentRow}>
@@ -63,12 +93,14 @@ export const NotificationScreen = () => {
                             </View>
                         ) : (
                             <View style={styles.avatarWrapper}>
-                                <View style={[styles.avatar, { backgroundColor: colors.glassBorder }]}>
-                                    <Text style={[styles.avatarLabel, { color: theme.text }]}>
-                                        {item.sender?.username?.[0]?.toUpperCase()}
-                                    </Text>
-                                </View>
-                                <View style={[styles.typeBadge, { backgroundColor: isDark ? theme.surface : '#fff' }]}>
+                                {item.sender?.avatar_url ? (
+                                    <Image source={{ uri: item.sender.avatar_url }} style={styles.avatarImage} />
+                                ) : (
+                                    <View style={[styles.avatar, { backgroundColor: colors.glassBorder }]}> 
+                                        <Text style={[styles.avatarLabel, { color: theme.text }]}> {item.sender?.username?.[0]?.toUpperCase()} </Text>
+                                    </View>
+                                )}
+                                <View style={[styles.typeBadge, { backgroundColor: isDark ? theme.surface : '#fff' }]}> 
                                     {getIcon(item.type)}
                                 </View>
                             </View>
@@ -78,24 +110,46 @@ export const NotificationScreen = () => {
                     <View style={styles.mainSection}>
                         <View style={styles.textRow}>
                             {!isSystem && (
-                                <Text style={[styles.username, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                    {item.sender?.username}{' '}
+                                <Text
+                                    style={[styles.username, { color: theme.text, fontFamily: typography.bodyMedium }]}
+                                    onPress={() => {
+                                        const sid = (item as any).sender_id ?? null
+                                        if (sid) navigation.navigate('PublicProfile', { userId: sid } as any)
+                                    }}
+                                >
+                                    {`@${item.sender?.username ?? ''}`}
                                 </Text>
                             )}
-                            <Text style={[styles.bodyText, { color: isSystem ? theme.text : theme.secondaryText, fontFamily: typography.body, fontSize: 13 }]}>
+                            <Text style={[styles.bodyText, { color: isSystem ? theme.text : theme.secondaryText, fontFamily: typography.body, fontSize: 13 }]}> 
                                 {item.body}
-                                <Text style={[styles.timeText, { color: theme.secondaryText, fontSize: 11, opacity: 0.6 }]}>
-                                    {'  '}{formatDistanceToNow(new Date(item.created_at), { locale: tr }).replace('yaklaşık ', '')}
+                                <Text style={[styles.timeText, { color: theme.secondaryText, fontSize: 11, opacity: 0.6 }]}> 
+                                    {'  '}{safeFormatTime(item.created_at)}
                                 </Text>
                             </Text>
                         </View>
                     </View>
 
                     {isFollow && (
-                        <TouchableOpacity style={[styles.followBtn, { backgroundColor: colors.saffron }]}>
+                        <TouchableOpacity
+                            style={[styles.followBtn, { backgroundColor: colors.saffron }]}
+                            onPress={async () => {
+                                const targetUser = (item as any).sender_id ?? null
+                                if (targetUser && user?.uid) {
+                                    try { await followUser(user.uid, targetUser) } catch { /* no-op */ }
+                                }
+                            }}
+                        >
                             <Text style={[styles.followBtnText, { fontFamily: typography.bodyMedium }]}>Takip Et</Text>
                         </TouchableOpacity>
                     )}
+
+                    {/* Right thumbnail for post-related notifications */}
+                    {((item as any).postId ?? (item as any).post_id ?? (item as any).postThumbnail) ? (
+                        <Image
+                            source={{ uri: (item as any).post_thumbnail_url || (item as any).thumbnail_url || '' }}
+                            style={styles.notificationThumb}
+                        />
+                    ) : null}
 
                     {!item.is_read && <View style={[styles.unreadDot, { backgroundColor: colors.saffron }]} />}
                 </View>
@@ -273,6 +327,11 @@ const styles = StyleSheet.create({
         height: 8,
         borderRadius: 4,
         marginLeft: 8,
+    },
+    avatarImage: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
     },
     emptyContainer: {
         paddingTop: 100,

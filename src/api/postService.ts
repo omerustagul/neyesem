@@ -1,19 +1,4 @@
-﻿import {
-    addDoc,
-    arrayRemove,
-    arrayUnion,
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    getDocs,
-    increment,
-    onSnapshot,
-    query,
-    serverTimestamp,
-    updateDoc,
-    where
-} from 'firebase/firestore';
+import { addDoc, arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, increment, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { createNotification } from './notificationService';
 import { sendPalateSignal } from './palateService';
@@ -495,4 +480,40 @@ export const deletePost = async (postId: string, userId: string): Promise<void> 
         console.error('Error deleting post:', error);
         throw error;
     }
+};
+// Removed duplicate import; using existing top-level import from firebase/firestore
+// db import is defined at the top
+
+// Archive a post and decrement the owner's post_count
+export const archivePostForUser = async (userId: string, postId: string) => {
+  try {
+    const postRef = doc(db, 'posts', postId);
+    await updateDoc(postRef, { archived: true });
+    const profileRef = doc(db, 'profiles', userId);
+    const snap = await getDoc(profileRef);
+    if (snap.exists()) {
+      const current = snap.data().post_count ?? 0;
+      const next = Math.max(0, current - 1);
+      await updateDoc(profileRef, { post_count: next });
+    }
+  } catch (e) {
+    console.error('Failed to archive post and update count', e);
+  }
+};
+
+// Save a post for a user (increment saved list/count)
+export const savePostForUser = async (userId: string, postId: string) => {
+  try {
+    // Example: add to a saved_by array on post and update profile's saved_count
+    const postRef = doc(db, 'posts', postId);
+    await updateDoc(postRef, { saved_by: arrayUnion(userId) });
+    const profileRef = doc(db, 'profiles', userId);
+    const snap = await getDoc(profileRef);
+    if (snap.exists()) {
+      const current = snap.data().saved_count ?? 0;
+      await updateDoc(profileRef, { saved_count: current + 1 });
+    }
+  } catch (e) {
+    console.error('Failed to save post for user', e);
+  }
 };

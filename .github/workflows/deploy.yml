@@ -1,0 +1,48 @@
+name: Deploy (CI/CD with EAS)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install EAS CLI
+        run: npm i -g eas-cli
+      - name: Login to Expo
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: echo "$EXPO_TOKEN" | npx eas login --token
+      - name: Build Android (Prod)
+        run: npx eas build -p android --profile production --non-interactive
+      - name: Build iOS (Prod)
+        run: npx eas build -p ios --profile production --non-interactive
+      - name: Update OTA Prod (Android & iOS)
+        run: |
+          npx eas update -p ios --branch prod --message "CI: production OTA update" --non-interactive || true
+          npx eas update -p android --branch prod --message "CI: production OTA update" --non-interactive || true
+      - name: Build Android (Staging)
+        if: false  # enable when staging is ready
+        run: npx eas build -p android --profile staging --non-interactive
+      - name: Build iOS (Staging)
+        if: false  # enable when staging is ready
+        run: npx eas build -p ios --profile staging --non-interactive
+      - name: Update OTA Staging (Android & iOS)
+        if: false  # enable when staging is ready
+        run: |
+          npx eas update -p ios --branch staging --message "CI: staging OTA update" --non-interactive || true
+          npx eas update -p android --branch staging --message "CI: staging OTA update" --non-interactive || true
+      - name: Submit to Stores (optional)
+        if: ${{ secrets.EAS_SUBMIT_ENABLED == 'true' }}
+        run: |
+          npx eas submit -p ios --platform ios --non-interactive || true
+          npx eas submit -p android --platform android --non-interactive || true

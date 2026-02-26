@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { Camera, Eye, Settings, User as UserIcon } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { Post, subscribeToUserPosts } from '../../api/postService';
@@ -117,11 +117,16 @@ export const ProfileScreen = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
+            {isRefreshing && (
+              <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', zIndex: 9999 }]}>
+                <ActivityIndicator color={colors.saffron} />
+              </View>
+            )}
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 16 }]}
                 showsVerticalScrollIndicator={false}
                 bounces={true}
-                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.saffron} />}
+                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.saffron} />} 
             >
                 {/* Settings */}
                 <View style={styles.topRow}>

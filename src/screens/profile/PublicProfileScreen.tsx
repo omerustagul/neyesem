@@ -2,7 +2,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { ArrowLeft, User as UserIcon } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { followUser, unfollowUser } from '../../api/followService';
@@ -110,6 +110,11 @@ export const PublicProfileScreen = () => {
                 <View style={{ width: 40 }} />
             </View>
 
+            {isRefreshing && (
+              <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', zIndex: 9999 }]}>
+                <ActivityIndicator color={colors.saffron} />
+              </View>
+            )}
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}

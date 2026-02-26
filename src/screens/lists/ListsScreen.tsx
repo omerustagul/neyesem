@@ -67,7 +67,7 @@ const ListCard = ({ list, onPress }: any) => {
             <GlassCard
                 style={styles.listCard}
                 contentStyle={styles.listCardContent}
-                borderRadius={20}
+                borderRadius={24}
             >
                 {thumbnail && (
                     <ExpoImage
