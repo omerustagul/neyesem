@@ -254,6 +254,13 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
         return () => subscription.remove();
     }, [player, handleNext]);
 
+    // Handle early close if no story exists
+    useEffect(() => {
+        if (!currentStory && visible) {
+            safeOnClose();
+        }
+    }, [currentStory, visible, safeOnClose]);
+
     const dismissViewer = useCallback(() => {
         'worklet';
         translateY.value = withTiming(height, { duration: 300 }, () => {
@@ -456,11 +463,6 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
         ]
     }));
 
-    if (!currentStory && visible) {
-        safeOnClose();
-        return null;
-    }
-
     if (!currentStory) return null;
 
     return (
@@ -548,7 +550,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
                                     </BlurView>
                                 </View>
 
-                                {currentStory.text && (
+                                {!!currentStory.text && (
                                     <View style={styles.textOverlay} pointerEvents="none">
                                         <Text style={[styles.storyText, { color: currentStory.textColor || '#fff' }]}>
                                             {currentStory.text}
@@ -632,7 +634,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
                             visible={showOptions}
                             title="Hikaye Seçenekleri"
                             options={storyOptions}
-                        onClose={() => {
+                            onClose={() => {
                                 // Close options and resume playback
                                 setShowOptions(false);
                                 setIsPaused(false);

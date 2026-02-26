@@ -151,6 +151,7 @@ export const PantryScreen = () => {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <FlatList
+                contentContainerStyle={styles.flatListContent}
                 ListHeaderComponent={
                     <>
                         {/* Header / Hero */}
@@ -235,7 +236,7 @@ export const PantryScreen = () => {
                 }
                 ListFooterComponent={
                     <>
-                        {suggestions.length > 0 && (
+                        {!!(suggestions.length > 0) && (
                             <View style={styles.suggestionsSection}>
                                 <View style={styles.sectionHeader}>
                                     <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
@@ -281,11 +282,14 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     heroSection: {
-        padding: 24,
-        paddingTop: 60,
+        paddingVertical: 24,
+        paddingHorizontal: 0,
+    },
+    flatListContent: {
+        paddingHorizontal: 18,
     },
     heroTitle: {
-        fontSize: 32,
+        fontSize: 26,
         marginBottom: 8,
     },
     heroSub: {
@@ -325,7 +329,7 @@ const styles = StyleSheet.create({
     },
     manualInputContainer: {
         flexDirection: 'row',
-        paddingHorizontal: 24,
+        paddingHorizontal: 0,
         gap: 12,
         marginBottom: 10,
     },
@@ -333,14 +337,14 @@ const styles = StyleSheet.create({
         flex: 1,
         height: 50,
         borderWidth: 1,
-        borderRadius: 12,
+        borderRadius: 16,
         paddingHorizontal: 16,
     },
     inputAddBtn: {
         backgroundColor: colors.mintFresh,
         paddingHorizontal: 20,
         justifyContent: 'center',
-        borderRadius: 12,
+        borderRadius: 16,
     },
     inputAddBtnText: {
         color: '#fff',
@@ -352,9 +356,9 @@ const styles = StyleSheet.create({
     },
     ingredientCard: {
         flex: 1,
-        margin: 6,
+        margin: 4,
         padding: 16,
-        borderRadius: 16,
+        borderRadius: 20,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
@@ -397,7 +401,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     sectionHeader: {
-        paddingHorizontal: 24,
+        paddingHorizontal: 0,
         marginTop: 20,
         marginBottom: 10,
     },
@@ -409,14 +413,14 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     suggestionsList: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 6,
         paddingVertical: 10,
     },
     suggestionItem: {
         width: 220,
         height: 280,
         borderRadius: 24,
-        marginHorizontal: 8,
+        marginRight: 12,
         overflow: 'hidden',
         backgroundColor: '#000',
     },

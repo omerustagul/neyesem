@@ -3,9 +3,11 @@ import { Image as ExpoImage } from 'expo-image';
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { Bookmark, Lock, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
+import type { Post } from '../../api/postService';
+import { getSavedPostsForUser } from '../../api/postService';
 import { GlassCard } from '../../components/glass/GlassCard';
 import { CreateListPopup } from '../../components/lists/CreateListPopup';
 import { useAuthStore } from '../../store/authStore';
@@ -67,9 +69,9 @@ const ListCard = ({ list, onPress }: any) => {
             <GlassCard
                 style={styles.listCard}
                 contentStyle={styles.listCardContent}
-                borderRadius={24}
+                borderRadius={25}
             >
-                {thumbnail && (
+                {!!thumbnail && (
                     <ExpoImage
                         source={{ uri: thumbnail }}
                         style={[StyleSheet.absoluteFill, { opacity: 0.15, borderRadius: 24 }]}
@@ -108,6 +110,7 @@ export const ListsScreen = () => {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation<any>();
     const [userLists, setUserLists] = useState<any[]>([]);
+    const [savedPosts, setSavedPosts] = useState<Post[]>([]);
     const [isCreateVisible, setIsCreateVisible] = useState(false);
     const headerHeight = 52 + insets.top;
 
@@ -129,6 +132,20 @@ export const ListsScreen = () => {
 
         return () => unsubscribe();
     }, [user]);
+
+    // Load saved posts for the current user
+    useEffect(() => {
+        const loadSaved = async () => {
+            if (!user?.uid) return;
+            try {
+                const posts = await getSavedPostsForUser(user.uid);
+                setSavedPosts(posts);
+            } catch {
+                setSavedPosts([]);
+            }
+        };
+        loadSaved();
+    }, [user?.uid]);
 
     const combinedLists = [...DEFAULT_LISTS, ...userLists];
 
@@ -163,6 +180,21 @@ export const ListsScreen = () => {
                             onPress={() => navigation.navigate('ListDetail', { listId: list.id, listTitle: list.title })}
                         />
                     ))}
+                    {!!(savedPosts.length > 0) && (
+                        <View style={{ marginTop: 12, marginBottom: 16, width: '100%' }}>
+                            <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 6, color: theme.text, fontFamily: typography.display }}>Kaydedilenler</Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+                                {savedPosts.map((p) => (
+                                    <View key={p.id} style={{ width: CARD_WIDTH_PERCENT, padding: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.04)', margin: 4 }}>
+                                        {!!(p.thumbnail_url || p.content_url) && (
+                                            <Image source={{ uri: (p.thumbnail_url || p.content_url) as string }} style={{ width: '100%', height: 100, borderRadius: 6 }} />
+                                        )}
+                                        <Text style={{ fontSize: 12, color: '#333' }} numberOfLines={2}>{p.caption || 'Post'}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
 
@@ -249,5 +281,38 @@ const styles = StyleSheet.create({
         fontSize: 11,
         opacity: 0.6,
         marginTop: 2,
+    },
+    // Saved posts section styles
+    savedSection: {
+        marginTop: 12,
+        marginBottom: 16,
+        width: '100%',
+    },
+    savedTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 6,
+    },
+    savedGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'flex-start',
+    },
+    savedCard: {
+        width: CARD_WIDTH_PERCENT,
+        padding: 6,
+        borderRadius: 8,
+        backgroundColor: 'rgba(0,0,0,0.04)',
+        margin: 4,
+    },
+    savedThumb: {
+        width: '100%',
+        height: 100,
+        borderRadius: 6,
+        marginBottom: 6,
+    },
+    savedCaption: {
+        fontSize: 12,
+        color: '#333',
     },
 });

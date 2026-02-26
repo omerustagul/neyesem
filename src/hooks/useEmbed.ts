@@ -15,23 +15,47 @@ export const useEmbed = (url: string) => {
             setError(null);
 
             try {
-                if (url.includes('instagram.com')) {
+                // Sanitize URL
+                const cleanUrl = url.split('?')[0].replace(/\/$/, '');
+
+                if (cleanUrl.includes('instagram.com') || cleanUrl.includes('instagr.am')) {
                     setPlatform('instagram');
-                    const response = await fetch(`https://api.instagram.com/oembed/?url=${url}&omitscript=true`);
-                    const data = await response.json();
-                    setEmbedHtml(data.html);
-                    setThumbnail(data.thumbnail_url);
-                } else if (url.includes('tiktok.com')) {
+                    try {
+                        const response = await fetch(`https://api.instagram.com/oembed/?url=${cleanUrl}&omitscript=true`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            setEmbedHtml(data.html);
+                            setThumbnail(data.thumbnail_url);
+                        } else {
+                            // Fallback for Instagram if oEmbed fails (common due to auth requirements)
+                            setEmbedHtml(`<blockquote class="instagram-media" data-instgrm-permalink="${cleanUrl}/" data-instgrm-version="14" style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);"></blockquote>`);
+                        }
+                    } catch (e) {
+                        setEmbedHtml(`<blockquote class="instagram-media" data-instgrm-permalink="${cleanUrl}/" data-instgrm-version="14" style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);"></blockquote>`);
+                    }
+                } else if (cleanUrl.includes('tiktok.com')) {
                     setPlatform('tiktok');
-                    const response = await fetch(`https://www.tiktok.com/oembed?url=${url}`);
-                    const data = await response.json();
-                    setEmbedHtml(data.html);
-                    setThumbnail(data.thumbnail_url);
+                    try {
+                        const response = await fetch(`https://www.tiktok.com/oembed?url=${cleanUrl}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            setEmbedHtml(data.html);
+                            setThumbnail(data.thumbnail_url);
+                        } else {
+                            // Fallback for TikTok
+                            const videoId = cleanUrl.split('/video/')[1] || cleanUrl.split('/').pop();
+                            setEmbedHtml(`<blockquote class="tiktok-embed" cite="${cleanUrl}" data-video-id="${videoId}" style="max-width: 605px;min-width: 325px;" > <section> </section> </blockquote>`);
+                        }
+                    } catch (e) {
+                        const videoId = cleanUrl.split('/video/')[1] || cleanUrl.split('/').pop();
+                        setEmbedHtml(`<blockquote class="tiktok-embed" cite="${cleanUrl}" data-video-id="${videoId}" style="max-width: 605px;min-width: 325px;" > <section> </section> </blockquote>`);
+                    }
                 } else {
                     setPlatform('unknown');
                     setError('Unsupported platform');
                 }
             } catch (err) {
+                console.error('Embed fetch error:', err);
                 setError('Failed to fetch embed content');
             } finally {
                 setIsLoading(false);

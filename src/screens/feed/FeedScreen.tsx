@@ -3,7 +3,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { ChefHat, Plus, TrendingUp, Utensils } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
-import { Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Challenge, UserChallengeProgress, subscribeToGlobalChallenge, subscribeToUserChallengeProgress } from '../../api/challengeService';
 import { db } from '../../api/firebase';
@@ -294,9 +294,9 @@ export const FeedScreen = () => {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
             {isRefreshing && (
-              <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', pointerEvents: 'none', zIndex: 9999 }]}> 
-                <ActivityIndicator color={colors.saffron} />
-              </View>
+                <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', pointerEvents: 'none', zIndex: 9999 }]}>
+                    <ActivityIndicator color={colors.saffron} />
+                </View>
             )}
             {posts.length > 0 ? (
                 <FlatList
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     emptyTitle: { fontSize: 24, marginBottom: 8 },
     emptySubtitle: { fontSize: 15, lineHeight: 22, textAlign: 'center', maxWidth: 300, marginBottom: 32 },
     tipContainer: { width: '100%', gap: 12 },
-    tipCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
+    tipCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 1 },
     tipText: { flex: 1, fontSize: 13, lineHeight: 18 },
     storyBar: { paddingVertical: 4 },
     storyBarContent: { paddingHorizontal: 12, gap: 16 },

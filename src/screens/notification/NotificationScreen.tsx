@@ -3,13 +3,13 @@ import { formatDistanceToNow as _formatDistanceToNow } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { Archive, ArrowLeft, Bell, CheckCircle, Heart, MessageCircle, Star, UserPlus } from 'lucide-react-native';
 import React, { useEffect } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { followUser } from '../../api/followService';
 import { useAuthStore } from '../../store/authStore';
 import { AppNotification, useNotificationStore } from '../../store/notificationStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
-import { followUser } from '../../api/followService';
 
 export const NotificationScreen = () => {
     const { theme, typography, isDark } = useTheme();
@@ -54,7 +54,7 @@ export const NotificationScreen = () => {
     useEffect(() => {
         if (!notifications || notifications.length === 0) return;
         notifications.filter(n => !n.is_read && n.id).forEach(n => {
-            markAsRead(n.id).catch(() => {});
+            markAsRead(n.id).catch(() => { });
         });
     }, [notifications]);
 
@@ -96,11 +96,11 @@ export const NotificationScreen = () => {
                                 {item.sender?.avatar_url ? (
                                     <Image source={{ uri: item.sender.avatar_url }} style={styles.avatarImage} />
                                 ) : (
-                                    <View style={[styles.avatar, { backgroundColor: colors.glassBorder }]}> 
+                                    <View style={[styles.avatar, { backgroundColor: colors.glassBorder }]}>
                                         <Text style={[styles.avatarLabel, { color: theme.text }]}> {item.sender?.username?.[0]?.toUpperCase()} </Text>
                                     </View>
                                 )}
-                                <View style={[styles.typeBadge, { backgroundColor: isDark ? theme.surface : '#fff' }]}> 
+                                <View style={[styles.typeBadge, { backgroundColor: isDark ? theme.surface : '#fff' }]}>
                                     {getIcon(item.type)}
                                 </View>
                             </View>
@@ -120,9 +120,9 @@ export const NotificationScreen = () => {
                                     {`@${item.sender?.username ?? ''}`}
                                 </Text>
                             )}
-                            <Text style={[styles.bodyText, { color: isSystem ? theme.text : theme.secondaryText, fontFamily: typography.body, fontSize: 13 }]}> 
+                            <Text style={[styles.bodyText, { color: isSystem ? theme.text : theme.secondaryText, fontFamily: typography.body, fontSize: 13 }]}>
                                 {item.body}
-                                <Text style={[styles.timeText, { color: theme.secondaryText, fontSize: 11, opacity: 0.6 }]}> 
+                                <Text style={[styles.timeText, { color: theme.secondaryText, fontSize: 11, opacity: 0.6 }]}>
                                     {'  '}{safeFormatTime(item.created_at)}
                                 </Text>
                             </Text>
@@ -354,5 +354,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
         lineHeight: 20,
+    },
+    notificationThumb: {
+        width: 44,
+        height: 44,
+        borderRadius: 8,
+        marginLeft: 12,
     },
 });

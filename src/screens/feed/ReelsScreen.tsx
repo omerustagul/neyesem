@@ -1,6 +1,7 @@
 import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Archive, ArrowLeft, Bookmark, Flame, Gauge, Heart, MessageCircle, MoreVertical, Pencil, Play, Timer, Trash2, Volume2, VolumeX } from 'lucide-react-native';
+import { Archive, ArrowLeft, Bookmark, Flame, Gauge, Heart, Instagram, MessageCircle, MoreVertical, Music2, Pencil, Play, Timer, Trash2, Volume2, VolumeX } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, FlatList, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,9 +28,10 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
     const [isPaused, setIsPaused] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [rate, setRate] = useState(1.0);
+    const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
 
     // Initialize expo-video player
-    const player = useVideoPlayer(post.content_url || '', (player: any) => {
+    const player = useVideoPlayer(post.content_url && post.content_url.length > 0 ? post.content_url : 'https://assets.mixkit.co/videos/preview/mixkit-transparent-water-in-slow-motion-44391-preview.mp4', (player: any) => {
         player.loop = true;
     });
 
@@ -57,7 +59,20 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
         setShowOptionsMenu(true);
     };
 
-    const { embedHtml, isLoading: isEmbedLoading } = useEmbed(post.content_url || '');
+    const { embedHtml, platform, isLoading: isEmbedLoading } = useEmbed(post.content_url || '');
+
+    const PlatformBadge = ({ platform }: { platform: string }) => {
+        if (platform === 'unknown') return null;
+        const isInstagram = platform === 'instagram';
+        return (
+            <View style={[styles.platformBadge, { backgroundColor: isInstagram ? '#E1306C40' : 'rgba(0,0,0,0.4)' }]}>
+                {isInstagram ? <Instagram size={10} color="#E1306C" /> : <Music2 size={10} color="#fff" />}
+                <Text style={[styles.platformText, { color: isInstagram ? '#E1306C' : '#fff' }]}>
+                    {isInstagram ? 'Instagram' : 'TikTok'}
+                </Text>
+            </View>
+        );
+    };
 
     return (
         <View style={styles.reelContainer}>
@@ -78,9 +93,27 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                                       <head>
                                         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
                                         <style>
-                                          body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; background: #000; height: 100vh; width: 100vw; overflow: hidden; }
-                                          iframe { width: 100% !important; height: 100% !important; border: none !important; }
-                                          .tiktok-embed { margin: 0 !important; width: 100% !important; height: 100% !important; }
+                                          body { 
+                                            margin: 0; 
+                                            padding: 0; 
+                                            display: flex; 
+                                            justify-content: center; 
+                                            align-items: center; 
+                                            background: #000; 
+                                            height: 100vh; 
+                                            width: 100vw; 
+                                            overflow: hidden; 
+                                          }
+                                          /* Hide non-media elements in embeds as much as possible */
+                                          .instagram-media, .tiktok-embed { 
+                                            margin: 0 !important; 
+                                            padding: 0 !important; 
+                                            border: none !important;
+                                            min-width: 100% !important;
+                                            max-width: 100% !important;
+                                          }
+                                          /* Targeted CSS for Instagram/TikTok elements to focus on media */
+                                          .EmbedHeader, .EmbedFooter, .UserTag, .SocialContext { display: none !important; }
                                         </style>
                                       </head>
                                       <body>
@@ -110,13 +143,13 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                 )}
             </TouchableOpacity>
 
-            {rate === 2.0 && (
+            {!!(rate === 2.0) && (
                 <View style={styles.speedIndicator}>
                     <Text style={styles.speedText}>2x</Text>
                 </View>
             )}
 
-            {isPaused && (
+            {!!isPaused && (
                 <View style={styles.pauseOverlay}>
                     <Play size={64} color="rgba(255,255,255,0.4)" fill="rgba(255,255,255,0.2)" />
                 </View>
@@ -141,7 +174,7 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                         <Text style={styles.actionText}>{post.saves_count || 0}</Text>
                     </TouchableOpacity>
 
-                    {isOwner && (
+                    {!!isOwner && (
                         <TouchableOpacity style={styles.actionBtn} onPress={handleMorePress}>
                             <MoreVertical size={28} color="#fff" />
                         </TouchableOpacity>
@@ -150,55 +183,78 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
 
                 {/* Bottom Info */}
                 <View style={styles.bottomInfo}>
-                    <View style={styles.userInfo}>
-                        <TouchableOpacity
-                            style={{ flexDirection: 'row', alignItems: 'center' }}
-                            onPress={() => navigation.navigate('PublicProfile', { userId: post.userId })}
-                            activeOpacity={0.7}
-                        >
-                            <UserAvatar
-                                userId={post.userId}
-                                size={32}
-                                style={styles.avatar}
-                            />
-                            <Text style={[styles.username, { fontFamily: typography.bodyMedium }]}>{post.username}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.followBtn}>
-                            <Text style={styles.followText}>Takip Et</Text>
-                        </TouchableOpacity>
-                    </View>
+                    {post.content_type === 'embed' && <PlatformBadge platform={platform} />}
 
-                    <Text style={[styles.caption, { fontFamily: typography.body }]} numberOfLines={2}>
-                        {post.caption}
-                    </Text>
-
-                    {/* Food Info Row */}
-                    {(post.cooking_time || post.difficulty || post.calories) && (
-                        <View style={styles.foodInfoRow}>
-                            {post.cooking_time && (
-                                <View style={styles.foodInfoItem}>
-                                    <Timer size={14} color="#fff" />
-                                    <Text style={styles.foodInfoText}>{post.cooking_time}</Text>
-                                </View>
-                            )}
-                            {post.difficulty && (
-                                <View style={styles.foodInfoItem}>
-                                    <Gauge size={14} color="#fff" />
-                                    <Text style={styles.foodInfoText}>{post.difficulty}</Text>
-                                </View>
-                            )}
-                            {post.calories && (
-                                <View style={styles.foodInfoItem}>
-                                    <Flame size={14} color="#fff" />
-                                    <Text style={styles.foodInfoText}>{post.calories} kcal</Text>
-                                </View>
-                            )}
+                    {/* User Section */}
+                    <BlurView intensity={30} tint="dark" style={styles.floatingGlassSection}>
+                        <View style={styles.userInfo}>
+                            <TouchableOpacity
+                                style={{ flexDirection: 'row', alignItems: 'center' }}
+                                onPress={() => navigation.navigate('PublicProfile', { userId: post.userId })}
+                                activeOpacity={0.7}
+                            >
+                                <UserAvatar
+                                    userId={post.userId}
+                                    size={32}
+                                    style={styles.avatar}
+                                />
+                                <Text style={[styles.username, { fontFamily: typography.bodyMedium, maxWidth: width * 0.4 }]}>{post.username}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.followBtn}>
+                                <Text style={styles.followText}>Takip Et</Text>
+                            </TouchableOpacity>
                         </View>
+                    </BlurView>
+
+                    {/* Caption Section */}
+                    {!!post.caption && (
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}
+                        >
+                            <BlurView intensity={25} tint="dark" style={[styles.floatingGlassSection, { marginTop: 8 }]}>
+                                <Text
+                                    style={[styles.caption, { fontFamily: typography.body, marginBottom: 0 }]}
+                                    numberOfLines={isCaptionExpanded ? undefined : 2}
+                                >
+                                    {post.caption}
+                                </Text>
+                            </BlurView>
+                        </TouchableOpacity>
                     )}
 
-                    <TouchableOpacity style={styles.musicContainer} onPress={() => setIsMuted(!isMuted)}>
-                        {isMuted ? <VolumeX size={14} color="#fff" /> : <Volume2 size={14} color="#fff" />}
-                        <Text style={styles.musicText}>{isMuted ? 'Ses kapalı' : 'Ses açık'}</Text>
+                    {/* Food Info Section */}
+                    {!!(post.cooking_time || post.difficulty || post.calories) && (
+                        <BlurView intensity={25} tint="dark" style={[styles.floatingGlassSection, { marginTop: 8 }]}>
+                            <View style={[styles.foodInfoRow, { marginBottom: 0 }]}>
+                                {!!post.cooking_time && (
+                                    <View style={styles.foodInfoItem}>
+                                        <Timer size={14} color="#fff" />
+                                        <Text style={styles.foodInfoText}>{post.cooking_time}</Text>
+                                    </View>
+                                )}
+                                {!!post.difficulty && (
+                                    <View style={styles.foodInfoItem}>
+                                        <Gauge size={14} color="#fff" />
+                                        <Text style={styles.foodInfoText}>{post.difficulty}</Text>
+                                    </View>
+                                )}
+                                {!!post.calories && (
+                                    <View style={styles.foodInfoItem}>
+                                        <Flame size={14} color="#fff" />
+                                        <Text style={styles.foodInfoText}>{post.calories} kcal</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </BlurView>
+                    )}
+
+                    {/* Music/Sound Section */}
+                    <TouchableOpacity style={[styles.musicContainer, { marginTop: 8 }]} onPress={() => setIsMuted(!isMuted)}>
+                        <BlurView intensity={20} tint="light" style={styles.musicBlur}>
+                            {isMuted ? <VolumeX size={14} color="#fff" /> : <Volume2 size={14} color="#fff" />}
+                            <Text style={styles.musicText}>{isMuted ? 'Ses kapalı' : 'Ses açık'}</Text>
+                        </BlurView>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -284,7 +340,7 @@ export const ReelsScreen = () => {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-            {posts.length > 0 && (
+            {!!(posts.length > 0) && (
                 <FlatList
                     ref={flatListRef}
                     data={posts}
@@ -326,14 +382,14 @@ export const ReelsScreen = () => {
             </TouchableOpacity>
 
             {/* Popups */}
-            {activeCommentPostId && (
+            {!!activeCommentPostId && (
                 <CommentsPopup
                     postId={activeCommentPostId}
                     onClose={() => setActiveCommentPostId(null)}
                 />
             )}
 
-            {activeSavePostId && (
+            {!!activeSavePostId && (
                 <SavePopup
                     postId={activeSavePostId}
                     onClose={() => setActiveSavePostId(null)}
@@ -385,7 +441,7 @@ const styles = StyleSheet.create({
     userInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 1,
     },
     avatar: {
         width: 32,
@@ -412,7 +468,7 @@ const styles = StyleSheet.create({
         borderColor: '#fff',
         paddingHorizontal: 10,
         paddingVertical: 4,
-        borderRadius: 6,
+        borderRadius: 10,
     },
     followText: {
         color: '#fff',
@@ -484,5 +540,38 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         pointerEvents: 'none',
+    },
+    platformBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        gap: 6,
+        alignSelf: 'flex-start',
+        marginBottom: 8,
+    },
+    platformText: {
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    floatingGlassSection: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 18,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+        backgroundColor: 'rgba(0,0,0,0.15)',
+        width: width * 0.75, // Fixed width for alignment
+    },
+    musicBlur: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        gap: 8,
+        overflow: 'hidden',
     },
 });

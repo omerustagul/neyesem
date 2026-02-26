@@ -94,7 +94,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ showBack, title }) =
                                 style={styles.side}
                                 activeOpacity={0.7}
                             >
-                                <Plus color="#FFF" size={24} />
+                                <Plus color={theme.text} size={26} />
                             </TouchableOpacity>
                         )}
                     </View>

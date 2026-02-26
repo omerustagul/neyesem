@@ -13,7 +13,7 @@ export const GlassInput: React.FC<GlassInputProps> = ({ containerStyle, ...props
     return (
         <GlassSurface
             style={[styles.container, containerStyle]}
-            borderRadius={18}
+            borderRadius={16}
             intensity={28}
             backgroundColor={isDark ? 'rgba(255, 255, 255, 0.08)' : theme.glass}
             borderColor={theme.border}

@@ -162,7 +162,7 @@ export const ActivitiesScreen = () => {
             <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={[styles.backButton, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255)' : 'rgba(0,0,0,0)' }]}
+                    style={[styles.backButton, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
                 >
                     <ArrowLeft size={20} color={theme.text} />
                 </TouchableOpacity>

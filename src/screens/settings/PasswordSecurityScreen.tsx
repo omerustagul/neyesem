@@ -147,7 +147,7 @@ export const PasswordSecurityScreen = () => {
             <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={[styles.backButton, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255)' : 'rgba(0,0,0,0)' }]}
+                    style={[styles.backButton, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
                 >
                     <ArrowLeft size={20} color={theme.text} />
                 </TouchableOpacity>
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     iconCircle: {
         width: 56,
         height: 56,
-        borderRadius: 28,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 16,
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
         gap: 10,
         paddingHorizontal: 14,
         height: 48,
-        borderRadius: 14,
+        borderRadius: 16,
         borderWidth: 1,
     },
     input: {
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     primaryButton: {
         width: '100%',
         height: 48,
-        borderRadius: 14,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 8,

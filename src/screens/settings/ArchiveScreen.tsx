@@ -94,7 +94,7 @@ export const ArchiveScreen = () => {
             <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={[styles.backButton, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}
+                    style={[styles.backButton, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
                 >
                     <ArrowLeft color={theme.text} size={20} />
                 </TouchableOpacity>

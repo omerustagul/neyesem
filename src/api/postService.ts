@@ -517,3 +517,40 @@ export const savePostForUser = async (userId: string, postId: string) => {
     console.error('Failed to save post for user', e);
   }
 };
+
+// Get posts saved by a user
+export const getSavedPostsForUser = async (userId: string) => {
+  try {
+    const q = query(
+      collection(db, 'posts'),
+      where('saved_by', 'array-contains', userId)
+    );
+    const snap = await getDocs(q);
+    const posts = snap.docs.map((d) => {
+      const data = d.data() as any;
+      return {
+        id: d.id,
+        userId: data.userId,
+        username: data.username,
+        display_name: data.display_name,
+        avatar_url: data.avatar_url,
+        caption: data.caption,
+        content_type: data.content_type,
+        content_url: data.content_url,
+        likes_count: data.likes_count,
+        comments_count: data.comments_count,
+        saves_count: data.saves_count,
+        saved_by: data.saved_by,
+        is_archived: data.is_archived,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        thumbnail_url: data.thumbnail_url,
+      } as Post;
+    });
+    // Optional: sort by created_at desc if available
+    return posts;
+  } catch (e) {
+    console.error('Failed to fetch saved posts', e);
+    return [] as Post[];
+  }
+};

@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import { Clock, Coffee, Globe, Leaf, MapPin, Search, Sparkles, User, UtensilsCrossed, Wine, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Post } from '../../api/postService';
 import { searchPosts, searchUsers, UserProfile } from '../../api/searchService';
@@ -74,7 +74,7 @@ export const ExploreScreen = () => {
     }, []);
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}> 
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 16 }]}
                 showsVerticalScrollIndicator={false}
@@ -95,7 +95,7 @@ export const ExploreScreen = () => {
                     </Text>
                     <TouchableOpacity activeOpacity={0.7}>
                         <View style={styles.discoveryButton}>
-                            <Sparkles size={14} color={colors.warmWhite} />
+                            <Sparkles size={20} color={colors.warmWhite} />
                             <Text style={[styles.discoveryButtonText, { fontFamily: typography.bodyMedium }]}>
                                 YENİ KEŞİF
                             </Text>
@@ -129,7 +129,7 @@ export const ExploreScreen = () => {
 
                 {searchQuery.length > 0 ? (
                     <View style={styles.resultsContainer}>
-                        {searchResults.users.length > 0 && (
+                        {!!(searchResults.users.length > 0) && (
                             <View style={styles.resultSection}>
                                 <Text style={[styles.resultSectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
                                     KİŞİLER
@@ -143,7 +143,7 @@ export const ExploreScreen = () => {
                                             navigation.navigate('PublicProfile', { userId: user.id });
                                         }}
                                     >
-                                        {user.avatar_url ? (
+                                        {!!user.avatar_url ? (
                                             <Image source={{ uri: user.avatar_url }} style={styles.resultAvatar} />
                                         ) : (
                                             <View style={[styles.resultAvatarFallback, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
@@ -163,7 +163,7 @@ export const ExploreScreen = () => {
                             </View>
                         )}
 
-                        {searchResults.posts.length > 0 && (
+                        {!!(searchResults.posts.length > 0) && (
                             <View style={styles.resultSection}>
                                 <Text style={[styles.resultSectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
                                     TARİFLER
@@ -184,8 +184,8 @@ export const ExploreScreen = () => {
                                                     thumbnailUri={post.thumbnail_url}
                                                     style={styles.resultPostImage}
                                                 />
-                                            ) : post.thumbnail_url || post.content_url ? (
-                                                <Image source={{ uri: post.thumbnail_url || post.content_url }} style={styles.resultPostImage} />
+                                            ) : !!(post.thumbnail_url || post.content_url) ? (
+                                                <Image source={{ uri: (post.thumbnail_url || post.content_url) as string }} style={styles.resultPostImage} />
                                             ) : (
                                                 <View style={[styles.resultPostImage, { backgroundColor: colors.glassBorder }]} />
                                             )}
@@ -209,7 +209,7 @@ export const ExploreScreen = () => {
                 ) : (
                     <>
                         {/* Search History */}
-                        {searchHistory.length > 0 && (
+                        {!!(searchHistory.length > 0) && (
                             <View style={styles.historySection}>
                                 <View style={styles.historyHeader}>
                                     <Text style={[styles.sectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 40,
+        borderRadius: 16,
         borderWidth: 1,
         paddingHorizontal: 14,
         paddingVertical: 11,
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     cuisineIconWrap: {
         width: 32,
         height: 32,
-        borderRadius: 14,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 8,

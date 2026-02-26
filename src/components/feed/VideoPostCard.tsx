@@ -1,17 +1,17 @@
 import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
 import { Image as ExpoImage } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Archive, ChefHat, Flame, Gauge, MoreVertical, Pencil, Play, Timer, Trash2 } from 'lucide-react-native';
-import { useLevelStore } from '../../store/levelStore';
-import { useAuthStore } from '../../store/authStore';
+import { Archive, ChefHat, Flame, Gauge, Instagram, MoreVertical, Music2, Pencil, Play, Timer, Trash2 } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { sendPalateSignal } from '../../api/palateService';
-import { archivePost, deletePost, Post, savePostForUser } from '../../api/postService';
+import { archivePost, deletePost, Post } from '../../api/postService';
 import { useEmbed } from '../../hooks/useEmbed';
 import { useAuthStore } from '../../store/authStore';
+import { useLevelStore } from '../../store/levelStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 import { SelectionPopup } from '../common/SelectionPopup';
@@ -147,13 +147,31 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
                   <head>
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <style>
-                      body { margin: 0; padding: 0; display: flex; justify-content: center; background: transparent; }
-                      iframe { max-width: 100% !important; width: 100% !important; border: none !important; height: 100vh !important; }
+                      body { 
+                        margin: 0; 
+                        padding: 0; 
+                        display: flex; 
+                        justify-content: center; 
+                        align-items: center;
+                        background: #000; 
+                        min-height: 100vh;
+                        overflow: hidden;
+                      }
+                      /* Hide non-media elements in embeds as much as possible */
+                      .instagram-media, .tiktok-embed { 
+                        margin: 0 !important; 
+                        padding: 0 !important; 
+                        border: none !important;
+                        min-width: 100% !important;
+                        max-width: 100% !important;
+                      }
+                      /* Targeted CSS for Instagram/TikTok elements to focus on media */
+                      .EmbedHeader, .EmbedFooter, .UserTag, .SocialContext { display: none !important; }
                     </style>
                   </head>
                   <body>
                     ${embedHtml}
-                    <script async src="//www.instagram.com/embed.js"></script>
+                    <script async src="https://www.instagram.com/embed.js"></script>
                     <script async src="https://www.tiktok.com/embed.js"></script>
                   </body>
                 </html>
@@ -196,12 +214,12 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
                     contentFit="cover"
                     nativeControls={false}
                 />
-                {playbackRate === 2.0 && (
+                {!!(playbackRate === 2.0) && (
                     <View style={styles.speedIndicator}>
                         <Text style={styles.speedText}>2x</Text>
                     </View>
                 )}
-                {(isPaused || (!isVisible && post.content_url)) && (
+                {!!(isPaused || (!isVisible && post.content_url)) && (
                     <View style={styles.playIconContainer}>
                         <Play size={32} color="rgba(255,255,255,0.8)" fill="rgba(255,255,255,0.4)" />
                     </View>
@@ -220,6 +238,19 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
         </View>
     );
 
+    const PlatformBadge = ({ platform }: { platform: string }) => {
+        if (platform === 'unknown') return null;
+        const isInstagram = platform === 'instagram';
+        return (
+            <View style={[styles.platformBadge, { backgroundColor: isInstagram ? '#E1306C20' : '#00000020' }]}>
+                {isInstagram ? <Instagram size={12} color="#E1306C" /> : <Music2 size={12} color={theme.text} />}
+                <Text style={[styles.platformText, { color: isInstagram ? '#E1306C' : theme.text }]}>
+                    {isInstagram ? 'Instagram' : 'TikTok'}
+                </Text>
+            </View>
+        );
+    };
+
     return (
         <MotiView
             from={{ opacity: 0, translateY: 20 }}
@@ -229,27 +260,32 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
         >
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={[styles.userInfo, { flex: 1 }]}
-                    onPress={() => navigation.navigate('PublicProfile', { userId: post.userId })}
-                    activeOpacity={0.7}
-                >
-                    <UserAvatar
-                        userId={post.userId}
-                        size={38}
-                        style={styles.avatar}
-                    />
-                    <View>
-                        <Text style={[styles.username, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                            {post.display_name || post.username}
-                        </Text>
-                    </View>
-                </TouchableOpacity>
-                {isOwner && (
-                    <TouchableOpacity onPress={handleMorePress} style={styles.moreButton}>
-                        <MoreVertical size={20} color={theme.secondaryText} />
+                <BlurView intensity={20} tint={isDark ? 'dark' : 'light'} style={styles.headerGlass}>
+                    <TouchableOpacity
+                        style={[styles.userInfo, { flex: 1 }]}
+                        onPress={() => navigation.navigate('PublicProfile', { userId: post.userId })}
+                        activeOpacity={0.7}
+                    >
+                        <UserAvatar
+                            userId={post.userId}
+                            size={38}
+                            style={styles.avatar}
+                        />
+                        <View>
+                            <Text style={[styles.username, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                {post.display_name || post.username}
+                            </Text>
+                        </View>
                     </TouchableOpacity>
-                )}
+
+                    {post.content_type === 'embed' && <PlatformBadge platform={platform} />}
+
+                    {isOwner && (
+                        <TouchableOpacity onPress={handleMorePress} style={styles.moreButton}>
+                            <MoreVertical size={20} color={theme.secondaryText} />
+                        </TouchableOpacity>
+                    )}
+                </BlurView>
             </View>
 
             {/* Media Content */}
@@ -268,28 +304,30 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
             </View>
 
             {/* Post Caption */}
-            {post.caption && (
+            {!!post.caption && (
                 <View style={styles.captionContainer}>
-                    <Text style={[styles.caption, { color: theme.text, fontFamily: typography.body }]}>
-                        <Text style={{ fontFamily: typography.bodyMedium }}>{post.username} </Text>
-                        {post.caption}
-                    </Text>
+                    <BlurView intensity={15} tint={isDark ? 'dark' : 'light'} style={styles.captionGlass}>
+                        <Text style={[styles.caption, { color: theme.text, fontFamily: typography.body }]}>
+                            <Text style={{ fontFamily: typography.bodyMedium }}>{post.username}{' '}</Text>
+                            {post.caption}
+                        </Text>
+                    </BlurView>
                 </View>
             )}
 
             {/* Food Info Cards */}
-            {(post.cooking_time || post.difficulty || post.calories || post.protein) && (
+            {!!(post.cooking_time || post.difficulty || post.calories || post.protein) && (
                 <View style={styles.infoGrid}>
-                    {post.cooking_time && (
+                    {!!post.cooking_time && (
                         <InfoCard icon={Timer} label="Süre" value={post.cooking_time} color={colors.saffron} />
                     )}
-                    {post.difficulty && (
+                    {!!post.difficulty && (
                         <InfoCard icon={Gauge} label="Zorluk" value={post.difficulty} color={colors.mintFresh} />
                     )}
-                    {post.calories && (
+                    {!!post.calories && (
                         <InfoCard icon={Flame} label="Kalori" value={`${post.calories} kcal`} color={colors.spiceRed} />
                     )}
-                    {post.protein && (
+                    {!!post.protein && (
                         <InfoCard icon={ChefHat} label="Protein" value={post.protein} color={colors.oliveLight} />
                     )}
                 </View>
@@ -371,10 +409,13 @@ const styles = StyleSheet.create({
         borderRadius: 19,
     },
     mediaContainer: {
-        width: width,
+        width: width - 24,
+        marginHorizontal: 12,
+        borderRadius: 24,
         aspectRatio: 0.75, // 4:3 Ratio (Instagram Style)
         backgroundColor: 'rgba(0,0,0,0.05)',
         position: 'relative',
+        overflow: 'hidden',
     },
     speedIndicator: {
         position: 'absolute',
@@ -413,6 +454,8 @@ const styles = StyleSheet.create({
     webviewWrapper: {
         flex: 1,
         position: 'relative',
+        borderRadius: 24,
+        overflow: 'hidden',
     },
     mediaOverlay: {
         position: 'absolute',
@@ -478,5 +521,35 @@ const styles = StyleSheet.create({
         width: '100%',
         marginTop: 10,
         opacity: 0.3,
+    },
+    platformBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
+        gap: 6,
+        marginRight: 8,
+    },
+    platformText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    headerGlass: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+        borderRadius: 20,
+        flex: 1,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        overflow: 'hidden',
+    },
+    captionGlass: {
+        padding: 12,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        overflow: 'hidden',
     },
 });

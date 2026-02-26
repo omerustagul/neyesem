@@ -153,7 +153,7 @@ export const SeasonalCompass = () => {
                         {MONTH_NAMES[selectedMonth - 1]}
                     </Text>
                     <Text style={[styles.contentSubtitle, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                        {seasonService.getFoodsForMonth(selectedMonth).length} taze ürün mevsiminde
+                        Bu ay {seasonService.getFoodsForMonth(selectedMonth).length} ürün taze tüketilebilir.
                     </Text>
                 </View>
 
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     compassIcon: {
         width: 40,
         height: 40,
-        borderRadius: 14,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 10,
         paddingVertical: 6,
-        borderRadius: 12,
+        borderRadius: 10,
         gap: 4,
     },
     seasonEmoji: {
@@ -236,8 +236,8 @@ const styles = StyleSheet.create({
     },
     currentDot: {
         position: 'absolute',
-        top: 4,
-        right: 4,
+        top: 6,
+        right: 6,
         width: 6,
         height: 6,
         borderRadius: 3,
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     // Content
     contentCard: {
         marginTop: 16,
-        padding: 16,
+        padding: 4,
     },
     contentHeader: {
         marginBottom: 16,
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 10,
         paddingHorizontal: 12,
-        borderRadius: 14,
+        borderRadius: 20,
         borderWidth: 1,
         gap: 10,
     },

@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { Camera, Eye, Settings, User as UserIcon } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { Post, subscribeToUserPosts } from '../../api/postService';
@@ -118,15 +118,15 @@ export const ProfileScreen = () => {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             {isRefreshing && (
-              <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', zIndex: 9999 }]}>
-                <ActivityIndicator color={colors.saffron} />
-              </View>
+                <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', zIndex: 9999 }]}>
+                    <ActivityIndicator color={colors.saffron} />
+                </View>
             )}
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 16 }]}
                 showsVerticalScrollIndicator={false}
                 bounces={true}
-                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.saffron} />} 
+                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.saffron} />}
             >
                 {/* Settings */}
                 <View style={styles.topRow}>
@@ -142,17 +142,17 @@ export const ProfileScreen = () => {
                 <TouchableOpacity
                     style={[
                         styles.avatarContainer,
-                        activeStories.length > 0 && { borderColor: colors.saffron, borderWidth: 3, padding: 3 }
+                        !!(activeStories.length > 0) && { borderColor: colors.saffron, borderWidth: 3, padding: 3 }
                     ]}
-                    onPress={() => activeStories.length > 0 && setViewerVisible(true)}
+                    onPress={() => !!(activeStories.length > 0) && setViewerVisible(true)}
                     onLongPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         setShowProfileMenu(true);
                     }}
                     activeOpacity={0.8}
                 >
-                    {profile?.avatar_url || profile?.avatarUrl || profile?.photoURL ? (
-                        <Image source={{ uri: profile.avatar_url || profile.avatarUrl || profile.photoURL }} style={styles.avatarImage} />
+                    {!!(profile?.avatar_url || profile?.avatarUrl || profile?.photoURL) ? (
+                        <Image source={{ uri: (profile.avatar_url || profile.avatarUrl || profile.photoURL) as string }} style={styles.avatarImage} />
                     ) : (
                         <View style={[styles.avatarFallback, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F0F4F1' }]}>
                             <UserIcon color={colors.oliveMuted} size={36} />
@@ -200,7 +200,12 @@ export const ProfileScreen = () => {
                                     style={styles.gridItem}
                                     onPress={() => navigation.navigate('Reels', { initialPostId: post.id })}
                                 >
-                                    <Image source={{ uri: post.thumbnail_url || post.content_url }} style={styles.gridImage} />
+                                    {!!(post.thumbnail_url || post.content_url) && (
+                                        <Image
+                                            source={{ uri: (post.thumbnail_url || post.content_url) as string }}
+                                            style={styles.gridImage}
+                                        />
+                                    )}
                                 </TouchableOpacity>
                             ))}
                         </View>
