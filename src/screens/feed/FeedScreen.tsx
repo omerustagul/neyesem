@@ -7,6 +7,7 @@ import { ActivityIndicator, FlatList, Platform, RefreshControl, ScrollView, Stat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Challenge, UserChallengeProgress, subscribeToGlobalChallenge, subscribeToUserChallengeProgress } from '../../api/challengeService';
 import { db } from '../../api/firebase';
+import { followUser, unfollowUser } from '../../api/followService';
 import { Post, subscribeToFollowedFeed, togglePostLike } from '../../api/postService';
 import { Story, subscribeToActiveStories } from '../../api/storyService';
 import { UserAvatar } from '../../components/common/UserAvatar';
@@ -276,16 +277,38 @@ export const FeedScreen = () => {
     const renderItem = ({ item }: { item: Post }) => {
         const isLiked = item.liked_by?.includes(user?.uid || '');
         const isVisible = viewableItems.includes(item.id);
+        const isFollowing = followingList.includes(item.userId);
+        const hasActiveStory = activeStories.some(s => s.userId === item.userId);
+
+        const handleToggleFollow = async () => {
+            if (!user) return;
+            try {
+                if (isFollowing) {
+                    await unfollowUser(user.uid, item.userId);
+                    setFollowingList(prev => prev.filter(id => id !== item.userId));
+                } else {
+                    await followUser(user.uid, item.userId);
+                    setFollowingList(prev => [...prev, item.userId]);
+                }
+            } catch (error) {
+                console.error('Error toggling follow:', error);
+            }
+        };
+
         return (
             <VideoPostCard
                 post={item}
                 isLiked={isLiked}
-                isVisible={isVisible && isPageActive}
-                isMutedOverride={!!activeCommentPostId || !!activeSavePostId}
                 onLike={() => handleLike(item.id)}
                 onComment={() => setActiveCommentPostId(item.id)}
                 onSave={() => setActiveSavePostId(item.id)}
                 onShare={() => { }}
+                isVisible={isVisible && isPageActive}
+                isMutedOverride={!!activeCommentPostId || !!activeSavePostId}
+                isFollowing={isFollowing}
+                onToggleFollow={handleToggleFollow}
+                hasActiveStory={hasActiveStory}
+                onOpenStory={() => handleStoryPress(item.userId)}
             />
         );
     };

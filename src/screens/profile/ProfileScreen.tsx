@@ -10,6 +10,7 @@ import { db } from '../../api/firebase';
 import { Post, subscribeToUserPosts } from '../../api/postService';
 import { Story, subscribeToActiveStories } from '../../api/storyService';
 import { SelectionOption, SelectionPopup } from '../../components/common/SelectionPopup';
+import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
 import { AnimatedLevelCard } from '../../components/level/AnimatedLevelCard';
 import { FollowListPopup } from '../../components/social/FollowListPopup';
 import { StoryViewer } from '../../components/social/StoryViewer';
@@ -201,9 +202,12 @@ export const ProfileScreen = () => {
                                     onPress={() => navigation.navigate('Reels', { initialPostId: post.id })}
                                 >
                                     {!!(post.thumbnail_url || post.content_url) && (
-                                        <Image
-                                            source={{ uri: (post.thumbnail_url || post.content_url) as string }}
+                                        <VideoThumbnail
+                                            videoUri={post.content_url || ''}
+                                            thumbnailUri={post.thumbnail_url}
                                             style={styles.gridImage}
+                                            showPlayIcon={post.content_type === 'video' || post.content_type === 'embed' || !!post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$/i)}
+                                            views={post.views || 0}
                                         />
                                     )}
                                 </TouchableOpacity>

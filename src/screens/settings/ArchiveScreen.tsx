@@ -1,11 +1,11 @@
 import { useNavigation } from '@react-navigation/native';
-import { Image as ExpoImage } from 'expo-image';
 import { ArrowLeft, Inbox, RefreshCw, Trash2 } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deletePost, Post, subscribeToArchivedPosts, unarchivePost } from '../../api/postService';
+import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
@@ -61,7 +61,14 @@ export const ArchiveScreen = () => {
 
     const renderItem = ({ item }: { item: Post }) => (
         <View style={[styles.postItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)', borderColor: theme.border }]}>
-            <ExpoImage source={{ uri: item.thumbnail_url || item.content_url }} style={styles.postImage} contentFit="cover" />
+            <View style={styles.postImage}>
+                <VideoThumbnail
+                    videoUri={item.content_url || ''}
+                    thumbnailUri={item.thumbnail_url}
+                    showPlayIcon={item.content_type === 'video' || item.content_type === 'embed' || !!item.content_url?.match(/\.(mp4|mov|m4v|m3u8)$/i)}
+                    views={item.views || 0}
+                />
+            </View>
             <View style={styles.postInfo}>
                 <Text style={[styles.postCaption, { color: theme.text, fontFamily: typography.body }]} numberOfLines={2}>
                     {item.caption}

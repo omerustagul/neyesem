@@ -1,9 +1,8 @@
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
-import { Image as ExpoImage } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, ScanLine, Trash2, UtensilsCrossed } from 'lucide-react-native';
+import { Plus, ScanLine, Sparkles, Trash2, UtensilsCrossed } from 'lucide-react-native';
 import { AnimatePresence, MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
 import {
@@ -47,9 +46,9 @@ export const PantryScreen = () => {
             setPantry(data);
             setIsLoading(false);
 
-            // Fetch suggestions when pantry updates
+            // Fetch AI suggestions when pantry updates
             if (data && data.ingredients.length > 0) {
-                fetchSuggestions(data.ingredients.map(i => i.name));
+                generateChefSuggestions(data.ingredients.map(i => i.name));
             } else {
                 setSuggestions([]);
             }
@@ -57,11 +56,50 @@ export const PantryScreen = () => {
         return () => unsubscribe();
     }, [user]);
 
-    const fetchSuggestions = async (ingredients: string[]) => {
+    const generateChefSuggestions = async (ingredients: string[]) => {
+        if (!ingredients.length) {
+            setSuggestions([]);
+            return;
+        }
+
         setIsFetchingSuggestions(true);
-        const matches = await pantryService.findMatchingRecipes(ingredients);
-        setSuggestions(matches);
-        setIsFetchingSuggestions(false);
+        const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+        if (!GEMINI_API_KEY) {
+            setIsFetchingSuggestions(false);
+            return;
+        }
+
+        try {
+            const prompt = `Şu malzemelere sahibim: ${ingredients.join(', ')}. Bana bu malzemeleri kullanarak yapabileceğim 2 farklı modern, yaratıcı ve lezzetli yemek tarifi öner. Yanıtını kesinlikle aşağıdaki JSON formatında, bir dizi (array) olarak ver:\n` +
+                `[\n  {\n    "id": "benzersiz-id",\n    "title": "Tarif Adı",\n    "description": "Kısa ve iştah açıcı tek cümlelik açıklama",\n    "hashtags": ["#saglikli", "#pratik"]\n  }\n]\nSadece JSON döndür, markdown veya başka metin ekleme.`;
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: prompt }]
+                    }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                    }
+                })
+            });
+
+            const result = await response.json();
+            if (result.candidates && result.candidates[0].content.parts[0].text) {
+                const text = result.candidates[0].content.parts[0].text.trim();
+                const recipes = JSON.parse(text);
+                setSuggestions(recipes);
+            } else {
+                setSuggestions([]);
+            }
+        } catch (error) {
+            console.error('Error generating AI recipes:', error);
+            setSuggestions([]);
+        } finally {
+            setIsFetchingSuggestions(false);
+        }
     };
 
     const handleAddManual = async () => {
@@ -69,6 +107,54 @@ export const PantryScreen = () => {
         await pantryService.addIngredient(user.uid, newIngredient.trim());
         setNewIngredient('');
         setShowAddManual(false);
+    };
+
+    const analyzeImageWithGemini = async (base64Image: string, mimeType: string = 'image/jpeg') => {
+        const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+        if (!GEMINI_API_KEY) {
+            Alert.alert('API Anahtarı Eksik', "Yapay zeka analizini kullanmak için EXPO_PUBLIC_GEMINI_API_KEY ortam değişkeni ayarlanmalıdır. (Örn: .env dosyasında)");
+            return null;
+        }
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: "Lütfen bu fotoğraftaki yiyecekleri, meyveleri, sebzeleri, atıştırmalıkları (örneğin: mandalina, galeta, elma, et vb.) ve yemek malzemelerini detaylıca analiz et. Gördüğün her türlü yiyecek öğesini Türkçe olarak SADECE virgülle ayırarak SADECE isimleri ile listele. Eğer hiçbir yiyecek veya malzeme yoksa 'YOK' yaz. Yanıtın sadece virgül ve kelimelerden oluşmalı, başka hiçbir açıklama veya ek kelime kullanma." },
+                            {
+                                inline_data: {
+                                    mime_type: mimeType,
+                                    data: base64Image
+                                }
+                            }
+                        ]
+                    }]
+                })
+            });
+
+            const result = await response.json();
+            console.log('Gemini Full Response:', JSON.stringify(result, null, 2));
+
+            if (result.candidates && result.candidates[0].content.parts[0].text) {
+                const text = result.candidates[0].content.parts[0].text.trim();
+                console.log('Gemini Parsed Text:', text);
+                const cleanText = text.replace(/[\n\r.]/g, '');
+                if (cleanText.toUpperCase() === 'YOK' || cleanText === '') {
+                    return [];
+                }
+                return cleanText.split(',').map((item: string) => item.trim());
+            } else if (result.error) {
+                console.error('Gemini API returned error object:', result.error);
+            }
+            return [];
+        } catch (error) {
+            console.error('Gemini API Error:', error);
+            Alert.alert('Hata', 'Görüntü analiz edilirken bir hata oluştu.');
+            return null;
+        }
     };
 
     const handleCameraScan = async () => {
@@ -82,19 +168,36 @@ export const PantryScreen = () => {
             allowsEditing: true,
             aspect: [4, 3],
             quality: 0.7,
+            base64: true,
         });
 
-        if (!result.canceled && user) {
+        if (!result.canceled && user && result.assets && result.assets.length > 0) {
+            const base64Img = result.assets[0].base64;
+            let mimeType = result.assets[0].mimeType;
+            if (!mimeType) {
+                // Determine format
+                mimeType = result.assets[0].uri.endsWith('.png') ? 'image/png' : 'image/jpeg';
+            }
+            if (!base64Img) return;
+
             setIsScanning(true);
-            // Simulate AI analysis for now
-            setTimeout(async () => {
-                const mockIngredients = ['Domates', 'Patates', 'Soğan'];
-                for (const item of mockIngredients) {
-                    await pantryService.addIngredient(user.uid, item);
+
+            const ingredients = await analyzeImageWithGemini(base64Img, mimeType);
+
+            if (ingredients && ingredients.length > 0) {
+                let addedCount = 0;
+                for (const item of ingredients) {
+                    if (item) {
+                        await pantryService.addIngredient(user.uid, item);
+                        addedCount++;
+                    }
                 }
-                setIsScanning(false);
-                // fetchSuggestions will be triggered by useEffect
-            }, 3000);
+                Alert.alert('Başarılı', `${addedCount} yiyecek buzdolabına eklendi:\n${ingredients.join(', ')}`);
+            } else if (ingredients && ingredients.length === 0) {
+                Alert.alert('Sonuç', 'Fotoğraf analiz edildi, yiyecek bulunamadı.');
+            }
+
+            setIsScanning(false);
         }
     };
 
@@ -116,36 +219,45 @@ export const PantryScreen = () => {
         </MotiView>
     );
 
-    const renderSuggestion = ({ item }: { item: any }) => (
-        <TouchableOpacity
-            style={styles.suggestionItem}
-            onPress={() => navigation.navigate('FoodDetail', { post: item })}
+    const renderChefSuggestion = ({ item, index }: { item: any, index: number }) => (
+        <MotiView
+            from={{ opacity: 0, translateY: 20 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ delay: index * 150 }}
         >
-            <ExpoImage
-                source={{ uri: item.thumbnail_url || item.content_url }}
-                style={styles.suggestionImage}
-                contentFit="cover"
-            />
-            <View style={styles.scoreBadge}>
-                <Text style={styles.scoreText}>%{item.matchScore} Eşleşme</Text>
-            </View>
             <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.8)']}
-                style={styles.suggestionGradient}
+                colors={isDark ? ['#1A1A1A', '#0D0D0D'] : ['#FFF', '#F5F5F5']}
+                style={[styles.aiRecipeCard, { borderColor: theme.border, borderWidth: 1 }]}
             >
-                <Text style={styles.suggestionTitle} numberOfLines={1}>{item.caption}</Text>
-                <View style={styles.missingInfo}>
-                    {item.missingCount > 0 ? (
-                        <Text style={styles.missingText}>
-                            -{item.missingCount} malzeme eksik ({item.missingIngredients.join(', ')})
-                        </Text>
-                    ) : (
-                        <Text style={[styles.missingText, { color: colors.mintFresh }]}>Tüm malzemeler var!</Text>
-                    )}
+                <View style={styles.aiRecipeHeader}>
+                    <Text style={[styles.aiRecipeTitle, { color: theme.text, fontFamily: typography.display }]} numberOfLines={2}>
+                        {item.title}
+                    </Text>
+                    <View style={styles.aiBadge}>
+                        <Sparkles size={12} color="#fff" />
+                        <Text style={styles.aiBadgeText}>AI Şef</Text>
+                    </View>
                 </View>
-                <Text style={styles.suggestionUser}>@{item.username}</Text>
+
+                <Text style={[styles.aiRecipeDescription, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                    {item.description}
+                </Text>
+
+                <View style={styles.hashtagRow}>
+                    {item.hashtags?.map((tag: string, idx: number) => (
+                        <TouchableOpacity
+                            key={idx}
+                            style={[styles.hashtagChip, { backgroundColor: isDark ? 'rgba(255,178,0,0.15)' : 'rgba(255,178,0,0.1)' }]}
+                            onPress={() => navigation.navigate('Explore', { searchQuery: tag })}
+                        >
+                            <Text style={[styles.hashtagText, { color: colors.saffron, fontFamily: typography.body }]}>
+                                {tag}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </LinearGradient>
-        </TouchableOpacity>
+        </MotiView>
     );
 
     return (
@@ -236,21 +348,32 @@ export const PantryScreen = () => {
                 }
                 ListFooterComponent={
                     <>
-                        {!!(suggestions.length > 0) && (
+                        {(suggestions.length > 0 || isFetchingSuggestions) && (
                             <View style={styles.suggestionsSection}>
                                 <View style={styles.sectionHeader}>
-                                    <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                        Sana Özel Öneriler
-                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                            Yapay Zeka Tarif Önerisi
+                                        </Text>
+                                        <Sparkles size={16} color={colors.saffron} />
+                                    </View>
                                 </View>
-                                <FlatList
-                                    horizontal
-                                    data={suggestions}
-                                    renderItem={renderSuggestion}
-                                    keyExtractor={(item) => item.id}
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={styles.suggestionsList}
-                                />
+                                {isFetchingSuggestions ? (
+                                    <View style={{ padding: 20, alignItems: 'center' }}>
+                                        <ActivityIndicator color={colors.saffron} />
+                                        <Text style={{ marginTop: 10, color: theme.secondaryText, fontFamily: typography.body }}>
+                                            AI Şef tarifleri düşünüyor...
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <View style={styles.aiRecipeContainer}>
+                                        {suggestions.map((item, index) => (
+                                            <React.Fragment key={index}>
+                                                {renderChefSuggestion({ item, index })}
+                                            </React.Fragment>
+                                        ))}
+                                    </View>
+                                )}
                             </View>
                         )}
                         <View style={{ height: 100 }} />
@@ -412,62 +535,56 @@ const styles = StyleSheet.create({
     suggestionsSection: {
         marginTop: 20,
     },
-    suggestionsList: {
-        paddingHorizontal: 6,
-        paddingVertical: 10,
+    aiRecipeContainer: {
+        paddingHorizontal: 16,
+        gap: 12,
     },
-    suggestionItem: {
-        width: 220,
-        height: 280,
-        borderRadius: 24,
-        marginRight: 12,
-        overflow: 'hidden',
-        backgroundColor: '#000',
-    },
-    suggestionImage: {
-        width: '100%',
-        height: '100%',
-        position: 'absolute',
-    },
-    scoreBadge: {
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        backgroundColor: colors.saffron,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    scoreText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    suggestionGradient: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: '50%',
-        justifyContent: 'flex-end',
+    aiRecipeCard: {
         padding: 16,
+        borderRadius: 20,
     },
-    suggestionTitle: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 4,
-    },
-    suggestionUser: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 12,
-    },
-    missingInfo: {
+    aiRecipeHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
         marginBottom: 8,
     },
-    missingText: {
-        color: 'rgba(255,255,255,0.9)',
-        fontSize: 11,
-        fontStyle: 'italic',
+    aiRecipeTitle: {
+        fontSize: 18,
+        flex: 1,
+        marginRight: 10,
+    },
+    aiBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.saffron,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
+    },
+    aiBadgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    aiRecipeDescription: {
+        fontSize: 14,
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+    hashtagRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    hashtagChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    hashtagText: {
+        fontSize: 12,
+        fontWeight: '500',
     },
 });

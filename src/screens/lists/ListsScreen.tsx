@@ -3,7 +3,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { Bookmark, Lock, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import type { Post } from '../../api/postService';
@@ -30,25 +30,41 @@ const GAP = 8;
 // Use percentage-based width for better responsiveness in a 2-column grid
 const CARD_WIDTH_PERCENT = '48.8%';
 
-const ListCard = ({ list, onPress }: any) => {
+const ListCard = ({ list, userUid, onPress }: any) => {
     const { theme, isDark, typography } = useTheme();
     const [thumbnail, setThumbnail] = useState<string | null>(null);
+    const [savedCount, setSavedCount] = useState<number>(0);
     const Icon = list.icon || Bookmark;
 
     useEffect(() => {
         const fetchThumbnail = async () => {
-            if (list.type === 'default') {
-                // Fetch latest saved post thumbnail for 'All Saved'
+            if (list.type === 'default' && userUid) {
                 try {
+                    // Use a real query instead of the hacky 'dummy' split
                     const q = query(
                         collection(db, 'posts'),
-                        where('saved_by', 'array-contains', doc(db, 'profiles', 'dummy').id.split('/')[0] === 'dummy' ? 'placeholder' : 'none') // This is tricky for default
+                        where('saved_by', 'array-contains', userUid)
                     );
-                    // For simplicity, just get the very latest post if it's default 'All Saved'
-                    // In a real app we'd fetch the user's latest saved post
-                } catch { }
+
+                    const unsubscribe = onSnapshot(q, (snapshot) => {
+                        setSavedCount(snapshot.docs.length);
+                        if (snapshot.docs.length > 0) {
+                            // Sort locally to get the latest
+                            const posts = snapshot.docs.map(doc => doc.data());
+                            posts.sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
+                            setThumbnail(posts[0].thumbnail_url || posts[0].content_url);
+                        } else {
+                            setThumbnail(null);
+                        }
+                    });
+
+                    return unsubscribe;
+                } catch (error) {
+                    console.error('Error fetching All Saved thumbnail:', error);
+                }
             } else if (list.postIds && list.postIds.length > 0) {
                 try {
+                    setSavedCount(list.postIds.length);
                     const postRef = doc(db, 'posts', list.postIds[list.postIds.length - 1]);
                     const postSnap = await getDoc(postRef);
                     if (postSnap.exists()) {
@@ -57,8 +73,11 @@ const ListCard = ({ list, onPress }: any) => {
                 } catch { }
             }
         };
-        fetchThumbnail();
-    }, [list]);
+        const unsub = fetchThumbnail();
+        return () => {
+            unsub.then(u => u && typeof u === 'function' && u());
+        };
+    }, [list, userUid]);
 
     return (
         <TouchableOpacity
@@ -96,7 +115,7 @@ const ListCard = ({ list, onPress }: any) => {
                         {list.title}
                     </Text>
                     <Text style={[styles.cardSubtitle, { color: theme.secondaryText, fontFamily: typography.body }]} numberOfLines={1}>
-                        {list.type === 'default' ? list.subtitle : `${list.postIds?.length || 0} içerik`}
+                        {list.type === 'default' ? `${savedCount} içerik` : `${savedCount} içerik`}
                     </Text>
                 </View>
             </GlassCard>
@@ -177,24 +196,10 @@ export const ListsScreen = () => {
                         <ListCard
                             key={list.id}
                             list={list}
+                            userUid={user?.uid}
                             onPress={() => navigation.navigate('ListDetail', { listId: list.id, listTitle: list.title })}
                         />
                     ))}
-                    {!!(savedPosts.length > 0) && (
-                        <View style={{ marginTop: 12, marginBottom: 16, width: '100%' }}>
-                            <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 6, color: theme.text, fontFamily: typography.display }}>Kaydedilenler</Text>
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-                                {savedPosts.map((p) => (
-                                    <View key={p.id} style={{ width: CARD_WIDTH_PERCENT, padding: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.04)', margin: 4 }}>
-                                        {!!(p.thumbnail_url || p.content_url) && (
-                                            <Image source={{ uri: (p.thumbnail_url || p.content_url) as string }} style={{ width: '100%', height: 100, borderRadius: 6 }} />
-                                        )}
-                                        <Text style={{ fontSize: 12, color: '#333' }} numberOfLines={2}>{p.caption || 'Post'}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        </View>
-                    )}
                 </View>
             </ScrollView>
 

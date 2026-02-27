@@ -2,12 +2,13 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { ArrowLeft, User as UserIcon } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { followUser, unfollowUser } from '../../api/followService';
 import { Post, subscribeToUserPosts } from '../../api/postService';
 import { Story, subscribeToActiveStories } from '../../api/storyService';
+import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
 import { AnimatedLevelCard } from '../../components/level/AnimatedLevelCard';
 import { FollowListPopup } from '../../components/social/FollowListPopup';
 import { StoryViewer } from '../../components/social/StoryViewer';
@@ -111,9 +112,9 @@ export const PublicProfileScreen = () => {
             </View>
 
             {isRefreshing && (
-              <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', zIndex: 9999 }]}>
-                <ActivityIndicator color={colors.saffron} />
-              </View>
+                <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', zIndex: 9999 }]}>
+                    <ActivityIndicator color={colors.saffron} />
+                </View>
             )}
             <ScrollView
                 showsVerticalScrollIndicator={false}
@@ -181,7 +182,13 @@ export const PublicProfileScreen = () => {
                         <View style={styles.postsGrid}>
                             {userPosts.map(post => (
                                 <TouchableOpacity key={post.id} style={styles.gridItem} onPress={() => navigation.navigate('Reels', { postId: post.id })}>
-                                    <Image source={{ uri: post.thumbnail_url || post.content_url }} style={styles.gridImage} />
+                                    <VideoThumbnail
+                                        videoUri={post.content_url || ''}
+                                        thumbnailUri={post.thumbnail_url}
+                                        style={styles.gridImage}
+                                        showPlayIcon={post.content_type === 'video' || post.content_type === 'embed' || !!post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$/i)}
+                                        views={post.views || 0}
+                                    />
                                 </TouchableOpacity>
                             ))}
                         </View>

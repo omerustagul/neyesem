@@ -71,6 +71,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
     const opacity = useSharedValue(1);
     const scale = useSharedValue(1);
     const viewersTranslateY = useSharedValue(height);
+    const openScale = useSharedValue(0.8);
+    const openOpacity = useSharedValue(0);
 
     const currentStory = stories[currentIndex];
     const isOwner = currentUser?.uid === currentStory?.userId;
@@ -86,7 +88,12 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
         if (isClosing.current) return;
         isClosing.current = true;
         if (player) {
-            player.pause();
+            try {
+                player.pause();
+            } catch (e) {
+                // Ignore NativeSharedObjectNotFoundException if player is already released
+                console.warn('Silent catch: player pause failed during close', e);
+            }
         }
         onClose();
     }, [onClose, player]);
@@ -200,10 +207,14 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
             translateX.value = 0;
             opacity.value = 1;
             scale.value = 1;
+            openScale.value = 0.8;
+            openOpacity.value = 0;
+            openScale.value = withTiming(1, { duration: 200 });
+            openOpacity.value = withTiming(1, { duration: 200 });
             setShowOptions(false);
             setShowViewers(false);
         }
-    }, [visible, initialIndex, translateY, translateX, opacity, scale]);
+    }, [visible, initialIndex, translateY, translateX, opacity, scale, openScale, openOpacity]);
 
     // Progress and mark as viewed logic
     useEffect(() => {
@@ -263,11 +274,11 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
 
     const dismissViewer = useCallback(() => {
         'worklet';
-        translateY.value = withTiming(height, { duration: 300 }, () => {
+        translateY.value = withTiming(height, { duration: 200 }, () => {
             runOnJS(safeOnClose)();
         });
-        opacity.value = withTiming(0, { duration: 300 });
-        scale.value = withTiming(0.8, { duration: 300 });
+        opacity.value = withTiming(0, { duration: 200 });
+        scale.value = withTiming(0.8, { duration: 200 });
     }, [translateY, height, opacity, scale, safeOnClose]);
 
     const fetchViewers = async () => {
@@ -377,6 +388,8 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
     };
 
     const panGesture = Gesture.Pan()
+        .activeOffsetX([-20, 20])
+        .activeOffsetY([-20, 20])
         .onUpdate((event) => {
             if (Math.abs(event.translationX) > Math.abs(event.translationY)) {
                 translateX.value = event.translationX;
@@ -434,26 +447,33 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
     const dismissAnimatedStyle = useAnimatedStyle(() => ({
         transform: [
             { translateY: translateY.value },
-            { scale: scale.value }
+            { scale: scale.value * openScale.value }
         ],
-        opacity: opacity.value,
+        opacity: opacity.value * openOpacity.value,
         borderRadius: interpolate(translateY.value, [0, 100], [0, 40], Extrapolate.CLAMP),
     }));
 
     const mediaAnimatedStyle = useAnimatedStyle(() => {
+        const perspective = 1000;
         const rotateY = interpolate(
             translateX.value,
             [-width, 0, width],
-            [90, 0, -90],
+            [-90, 0, 90],
             Extrapolate.CLAMP
         );
 
         return {
             transform: [
-                { perspective: 1000 },
+                { perspective },
                 { translateX: translateX.value },
                 { rotateY: `${rotateY}deg` },
-            ]
+            ],
+            opacity: interpolate(
+                Math.abs(translateX.value),
+                [0, width],
+                [1, 0.3],
+                Extrapolate.CLAMP
+            )
         };
     });
 

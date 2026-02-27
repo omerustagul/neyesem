@@ -6,6 +6,7 @@ import React, { useEffect } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { followUser } from '../../api/followService';
+import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
 import { useAuthStore } from '../../store/authStore';
 import { AppNotification, useNotificationStore } from '../../store/notificationStore';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -26,14 +27,14 @@ export const NotificationScreen = () => {
 
     const getIcon = (type: string) => {
         switch (type) {
-            case 'like': return <Heart size={16} color={colors.spiceRed} fill={colors.spiceRed} />;
-            case 'comment': return <MessageCircle size={16} color={theme.text} />;
-            case 'follow': return <UserPlus size={16} color="#3b82f6" />;
-            case 'system': return <Bell size={16} color={colors.saffron} />;
-            case 'archive': return <Archive size={16} color={theme.secondaryText} />;
-            case 'success': return <CheckCircle size={16} color="#22c55e" />;
-            case 'list': return <Star size={16} color={colors.saffron} fill={colors.saffron} />;
-            case 'level_up': return <Star size={16} color="#f59e0b" fill="#f59e0b" />;
+            case 'like': return <Heart size={12} color={colors.spiceRed} fill={colors.spiceRed} />;
+            case 'comment': return <MessageCircle size={12} color={theme.text} />;
+            case 'follow': return <UserPlus size={12} color="#3b82f6" />;
+            case 'system': return <Bell size={12} color={colors.saffron} />;
+            case 'archive': return <Archive size={12} color={theme.secondaryText} />;
+            case 'success': return <CheckCircle size={12} color="#22c55e" />;
+            case 'list': return <Star size={12} color={colors.saffron} fill={colors.saffron} />;
+            case 'level_up': return <Star size={12} color="#f59e0b" fill="#f59e0b" />;
             case 'xp_gained': return <Star size={16} color={colors.mintFresh} />;
             default: return <Bell size={16} color={colors.saffron} />;
         }
@@ -145,9 +146,11 @@ export const NotificationScreen = () => {
 
                     {/* Right thumbnail for post-related notifications */}
                     {((item as any).postId ?? (item as any).post_id ?? (item as any).postThumbnail) ? (
-                        <Image
-                            source={{ uri: (item as any).post_thumbnail_url || (item as any).thumbnail_url || '' }}
+                        <VideoThumbnail
+                            videoUri={(item as any).content_url || ''}
+                            thumbnailUri={(item as any).post_thumbnail_url || (item as any).thumbnail_url}
                             style={styles.notificationThumb}
+                            showPlayIcon={false}
                         />
                     ) : null}
 
@@ -222,7 +225,7 @@ const styles = StyleSheet.create({
     backButton: {
         width: 40,
         height: 40,
-        borderRadius: 14,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -242,7 +245,7 @@ const styles = StyleSheet.create({
         letterSpacing: 1.2,
     },
     notificationCard: {
-        borderRadius: 16,
+        borderRadius: 28,
         padding: 12,
         marginBottom: 10,
     },
@@ -256,7 +259,7 @@ const styles = StyleSheet.create({
     iconBox: {
         width: 44,
         height: 44,
-        borderRadius: 14,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -315,7 +318,7 @@ const styles = StyleSheet.create({
     followBtn: {
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 12,
+        borderRadius: 10,
         marginLeft: 8,
     },
     followBtnText: {

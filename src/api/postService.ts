@@ -16,8 +16,8 @@ export interface Post {
     content_url?: string;
     likes_count: number;
     comments_count: number;
-    shares_count: number;
     saves_count: number;
+    views?: number;
     liked_by: string[];
     saved_by: string[];
     is_archived: boolean;
@@ -486,71 +486,71 @@ export const deletePost = async (postId: string, userId: string): Promise<void> 
 
 // Archive a post and decrement the owner's post_count
 export const archivePostForUser = async (userId: string, postId: string) => {
-  try {
-    const postRef = doc(db, 'posts', postId);
-    await updateDoc(postRef, { archived: true });
-    const profileRef = doc(db, 'profiles', userId);
-    const snap = await getDoc(profileRef);
-    if (snap.exists()) {
-      const current = snap.data().post_count ?? 0;
-      const next = Math.max(0, current - 1);
-      await updateDoc(profileRef, { post_count: next });
+    try {
+        const postRef = doc(db, 'posts', postId);
+        await updateDoc(postRef, { archived: true });
+        const profileRef = doc(db, 'profiles', userId);
+        const snap = await getDoc(profileRef);
+        if (snap.exists()) {
+            const current = snap.data().post_count ?? 0;
+            const next = Math.max(0, current - 1);
+            await updateDoc(profileRef, { post_count: next });
+        }
+    } catch (e) {
+        console.error('Failed to archive post and update count', e);
     }
-  } catch (e) {
-    console.error('Failed to archive post and update count', e);
-  }
 };
 
 // Save a post for a user (increment saved list/count)
 export const savePostForUser = async (userId: string, postId: string) => {
-  try {
-    // Example: add to a saved_by array on post and update profile's saved_count
-    const postRef = doc(db, 'posts', postId);
-    await updateDoc(postRef, { saved_by: arrayUnion(userId) });
-    const profileRef = doc(db, 'profiles', userId);
-    const snap = await getDoc(profileRef);
-    if (snap.exists()) {
-      const current = snap.data().saved_count ?? 0;
-      await updateDoc(profileRef, { saved_count: current + 1 });
+    try {
+        // Example: add to a saved_by array on post and update profile's saved_count
+        const postRef = doc(db, 'posts', postId);
+        await updateDoc(postRef, { saved_by: arrayUnion(userId) });
+        const profileRef = doc(db, 'profiles', userId);
+        const snap = await getDoc(profileRef);
+        if (snap.exists()) {
+            const current = snap.data().saved_count ?? 0;
+            await updateDoc(profileRef, { saved_count: current + 1 });
+        }
+    } catch (e) {
+        console.error('Failed to save post for user', e);
     }
-  } catch (e) {
-    console.error('Failed to save post for user', e);
-  }
 };
 
 // Get posts saved by a user
 export const getSavedPostsForUser = async (userId: string) => {
-  try {
-    const q = query(
-      collection(db, 'posts'),
-      where('saved_by', 'array-contains', userId)
-    );
-    const snap = await getDocs(q);
-    const posts = snap.docs.map((d) => {
-      const data = d.data() as any;
-      return {
-        id: d.id,
-        userId: data.userId,
-        username: data.username,
-        display_name: data.display_name,
-        avatar_url: data.avatar_url,
-        caption: data.caption,
-        content_type: data.content_type,
-        content_url: data.content_url,
-        likes_count: data.likes_count,
-        comments_count: data.comments_count,
-        saves_count: data.saves_count,
-        saved_by: data.saved_by,
-        is_archived: data.is_archived,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        thumbnail_url: data.thumbnail_url,
-      } as Post;
-    });
-    // Optional: sort by created_at desc if available
-    return posts;
-  } catch (e) {
-    console.error('Failed to fetch saved posts', e);
-    return [] as Post[];
-  }
+    try {
+        const q = query(
+            collection(db, 'posts'),
+            where('saved_by', 'array-contains', userId)
+        );
+        const snap = await getDocs(q);
+        const posts = snap.docs.map((d) => {
+            const data = d.data() as any;
+            return {
+                id: d.id,
+                userId: data.userId,
+                username: data.username,
+                display_name: data.display_name,
+                avatar_url: data.avatar_url,
+                caption: data.caption,
+                content_type: data.content_type,
+                content_url: data.content_url,
+                likes_count: data.likes_count,
+                comments_count: data.comments_count,
+                saves_count: data.saves_count,
+                saved_by: data.saved_by,
+                is_archived: data.is_archived,
+                created_at: data.created_at,
+                updated_at: data.updated_at,
+                thumbnail_url: data.thumbnail_url,
+            } as Post;
+        });
+        // Optional: sort by created_at desc if available
+        return posts;
+    } catch (e) {
+        console.error('Failed to fetch saved posts', e);
+        return [] as Post[];
+    }
 };

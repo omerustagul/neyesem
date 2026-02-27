@@ -1,6 +1,7 @@
 import { AnimatePresence, MotiView } from 'moti';
 import React from 'react';
 import {
+    Dimensions,
     Modal,
     Platform,
     StyleSheet,
@@ -10,6 +11,8 @@ import {
     View
 } from 'react-native';
 import { useTheme } from '../../theme/ThemeProvider';
+
+const { width } = Dimensions.get('window');
 
 export interface SelectionOption {
     label: string;
@@ -26,13 +29,17 @@ interface SelectionPopupProps {
     title?: string;
     options: SelectionOption[];
     onClose: () => void;
+    customContent?: React.ReactNode;
+    showCustomContent?: boolean;
 }
 
 export const SelectionPopup: React.FC<SelectionPopupProps> = ({
     visible,
     title,
     options,
-    onClose
+    onClose,
+    customContent,
+    showCustomContent = false
 }) => {
     const { theme, isDark, typography } = useTheme();
 
@@ -133,91 +140,107 @@ export const SelectionPopup: React.FC<SelectionPopupProps> = ({
                             {/* Main container — anchored to bottom & sides */}
                             <View style={[
                                 styles.mainCard,
-                                { backgroundColor: containerBg },
+                                { backgroundColor: containerBg, paddingHorizontal: 0 },
                                 styles.shadow,
                             ]}>
-                                {/* Title */}
-                                {title && (
-                                    <Text style={[
-                                        styles.title,
-                                        {
-                                            color: secondaryTextColor,
-                                            fontFamily: typography.bodyMedium,
-                                        }
-                                    ]}>
-                                        {title.toLocaleUpperCase('tr-TR')}
-                                    </Text>
-                                )}
+                                <View style={{ flexDirection: 'row', width: width * 2 }}>
+                                    <MotiView
+                                        animate={{ translateX: showCustomContent ? -width : 0 }}
+                                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                                        style={{ width: width, paddingHorizontal: 32, gap: 10 }}
+                                    >
+                                        {/* Title */}
+                                        {title && (
+                                            <Text style={[
+                                                styles.title,
+                                                {
+                                                    color: secondaryTextColor,
+                                                    fontFamily: typography.bodyMedium,
+                                                }
+                                            ]}>
+                                                {title.toLocaleUpperCase('tr-TR')}
+                                            </Text>
+                                        )}
 
-                                {/* Options Grid */}
-                                <View style={styles.optionsGrid}>
-                                    {normalOptions.map((option, index) =>
-                                        renderOptionButton(option, index)
-                                    )}
+                                        {/* Options Grid */}
+                                        <View style={styles.optionsGrid}>
+                                            {normalOptions.map((option, index) =>
+                                                renderOptionButton(option, index)
+                                            )}
+                                        </View>
+
+                                        {/* Destructive options */}
+                                        {destructiveOptions.map((option, index) => (
+                                            <TouchableOpacity
+                                                key={`destructive-${index}`}
+                                                activeOpacity={0.6}
+                                                onPress={() => {
+                                                    option.onPress();
+                                                    onClose();
+                                                }}
+                                                style={[
+                                                    styles.optionButton,
+                                                    {
+                                                        backgroundColor: itemBg,
+                                                        width: '100%',
+                                                    }
+                                                ]}
+                                            >
+                                                {option.icon && (
+                                                    <View style={styles.optionIcon}>
+                                                        {renderIcon(option, textColor)}
+                                                    </View>
+                                                )}
+                                                <Text style={[
+                                                    styles.optionLabel,
+                                                    {
+                                                        color: textColor,
+                                                        fontFamily: typography.body,
+                                                    }
+                                                ]}>
+                                                    {option.label}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+
+                                        {/* Cancel button */}
+                                        {cancelOption && (
+                                            <TouchableOpacity
+                                                activeOpacity={0.6}
+                                                onPress={onClose}
+                                                style={[
+                                                    styles.cancelButton,
+                                                    { backgroundColor: cancelBg }
+                                                ]}
+                                            >
+                                                {cancelOption.icon ? (
+                                                    <View style={styles.optionIcon}>
+                                                        {renderIcon(cancelOption, cancelTextColor)}
+                                                    </View>
+                                                ) : (
+                                                    <Text style={[styles.cancelX, { fontFamily: typography.bodyMedium }]}>✕</Text>
+                                                )}
+                                                <Text style={[
+                                                    styles.optionLabel,
+                                                    {
+                                                        color: cancelTextColor,
+                                                        fontFamily: typography.bodyMedium,
+                                                    }
+                                                ]}>
+                                                    {cancelOption.label}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </MotiView>
+
+                                    <MotiView
+                                        animate={{ translateX: showCustomContent ? -width : 0 }}
+                                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                                        style={{ width: width, paddingHorizontal: 32 }}
+                                    >
+                                        {customContent}
+                                    </MotiView>
                                 </View>
-
-                                {/* Destructive options */}
-                                {destructiveOptions.map((option, index) => (
-                                    <TouchableOpacity
-                                        key={`destructive-${index}`}
-                                        activeOpacity={0.6}
-                                        onPress={() => {
-                                            option.onPress();
-                                            onClose();
-                                        }}
-                                        style={[
-                                            styles.optionButton,
-                                            {
-                                                backgroundColor: itemBg,
-                                                width: '100%',
-                                            }
-                                        ]}
-                                    >
-                                        {option.icon && (
-                                            <View style={styles.optionIcon}>
-                                                {renderIcon(option, textColor)}
-                                            </View>
-                                        )}
-                                        <Text style={[
-                                            styles.optionLabel,
-                                            {
-                                                color: textColor,
-                                                fontFamily: typography.body,
-                                            }
-                                        ]}>
-                                            {option.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-
-                                {/* Cancel button */}
-                                {cancelOption && (
-                                    <TouchableOpacity
-                                        activeOpacity={0.6}
-                                        onPress={onClose}
-                                        style={[
-                                            styles.cancelButton,
-                                            { backgroundColor: cancelBg }
-                                        ]}
-                                    >
-                                        {cancelOption.icon ? (
-                                            <View style={styles.optionIcon}>
-                                                {renderIcon(cancelOption, cancelTextColor)}
-                                            </View>
-                                        ) : (
-                                            <Text style={[styles.cancelX, { fontFamily: typography.bodyMedium }]}>✕</Text>
-                                        )}
-                                        <Text style={[
-                                            styles.optionLabel,
-                                            {
-                                                color: cancelTextColor,
-                                                fontFamily: typography.bodyMedium,
-                                            }
-                                        ]}>
-                                            {cancelOption.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
                             </View>
                         </MotiView>
                     )}
@@ -239,9 +262,8 @@ const styles = StyleSheet.create({
         borderBottomLeftRadius: 0,
         borderBottomRightRadius: 0,
         paddingTop: 24,
-        paddingHorizontal: 32,
         paddingBottom: Platform.OS === 'ios' ? 34 : 16,
-        gap: 10,
+        overflow: 'hidden',
     },
     shadow: {
         ...Platform.select({

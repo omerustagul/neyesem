@@ -12,7 +12,6 @@ import {
     Bookmark,
     ChevronLeft,
     Lock,
-    Play,
     Share2,
     Trash2
 } from 'lucide-react-native';
@@ -23,7 +22,6 @@ import {
     Alert,
     Dimensions,
     FlatList,
-    Image,
     Share,
     StyleSheet,
     Text,
@@ -33,6 +31,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { Post } from '../../api/postService';
+import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
@@ -144,13 +143,13 @@ export const ListDetailScreen = ({ route, navigation }: any) => {
                 activeOpacity={0.9}
                 onPress={() => navigation.navigate('Reels', { initialPostId: item.id })}
             >
-                <Image
-                    source={{ uri: item.thumbnail_url || item.content_url }}
+                <VideoThumbnail
+                    videoUri={item.content_url || ''}
+                    thumbnailUri={item.thumbnail_url}
                     style={styles.postThumbnail}
+                    showPlayIcon={true}
+                    views={item.views || 0}
                 />
-                <View style={styles.postOverlay}>
-                    <Play size={20} color="#fff" />
-                </View>
                 <View style={styles.postInfo}>
                     <Text style={[styles.postTitle, { color: '#fff', fontFamily: typography.bodyMedium }]} numberOfLines={1}>
                         {item.display_name || item.username}

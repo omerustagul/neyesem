@@ -1,9 +1,9 @@
 import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Archive, ArrowLeft, Bookmark, Flame, Gauge, Heart, Instagram, MessageCircle, MoreVertical, Music2, Pencil, Play, Timer, Trash2, Volume2, VolumeX } from 'lucide-react-native';
+import { Archive, ArrowLeft, Bookmark, Flag, Flame, Gauge, Heart, Info, Instagram, MessageCircle, MoreVertical, Music2, Pencil, Play, Timer, Trash2, User as UserIcon, UserMinus, Volume2, VolumeX } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, FlatList, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, FlatList, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { archivePost, deletePost, Post, subscribeToFeedPosts, togglePostLike } from '../../api/postService';
@@ -22,6 +22,7 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
     const { theme, isDark, typography } = useTheme();
     const { user } = useAuthStore();
     const navigation = useNavigation<any>();
+    const insets = useSafeAreaInsets();
     const isLiked = post.liked_by?.includes(user?.uid || '');
     const isSaved = post.saved_by?.includes(user?.uid || '');
     const isOwner = user?.uid === post.userId;
@@ -29,9 +30,14 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
     const [isMuted, setIsMuted] = useState(false);
     const [rate, setRate] = useState(1.0);
     const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
+    const [showReadMoreButton, setShowReadMoreButton] = useState(false);
+    const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+
+    const { embedHtml, nativeVideoUrl, platform, isLoading: isEmbedLoading } = useEmbed(post.content_url || '');
 
     // Initialize expo-video player
-    const player = useVideoPlayer(post.content_url && post.content_url.length > 0 ? post.content_url : 'https://assets.mixkit.co/videos/preview/mixkit-transparent-water-in-slow-motion-44391-preview.mp4', (player: any) => {
+    const isVideo = post.content_type === 'video' || (!post.content_type && post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$|firebase-storage/i)) || !!nativeVideoUrl;
+    const player = useVideoPlayer(isVideo ? (nativeVideoUrl || post.content_url || '') : 'https://assets.mixkit.co/videos/preview/mixkit-transparent-water-in-slow-motion-44391-preview.mp4', (player: any) => {
         player.loop = true;
     });
 
@@ -52,14 +58,53 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
         setIsPaused(!isPaused);
     };
 
-    const [showOptionsMenu, setShowOptionsMenu] = useState(false);
-
-    const handleMorePress = () => {
-        if (!isOwner) return;
-        setShowOptionsMenu(true);
+    const handleShare = async () => {
+        try {
+            await Share.share({
+                message: `Bu tarife göz at: ${post.caption}\n\nhttps://neyesem.app/post/${post.id}`,
+            });
+        } catch (error) {
+            console.error(error);
+        }
     };
 
-    const { embedHtml, platform, isLoading: isEmbedLoading } = useEmbed(post.content_url || '');
+    const handleReport = () => {
+        Alert.alert('Şikayet Et', 'Bu gönderiyi şikayet etmek istediğinize emin misiniz?', [
+            { text: 'İptal', style: 'cancel' },
+            {
+                text: 'Şikayet Et',
+                style: 'destructive',
+                onPress: () => {
+                    Alert.alert('Teşekkürler', 'Geri bildiriminiz alındı ve incelenecek.');
+                }
+            }
+        ]);
+    };
+
+    const handleUnfollow = async () => {
+        Alert.alert('Takibi Bırak', `@${post.username} kullanıcısını takipten çıkarmak istiyor musunuz?`, [
+            { text: 'Vazgeç', style: 'cancel' },
+            {
+                text: 'Takipten Çıkar',
+                style: 'destructive',
+                onPress: async () => {
+                    if (!user) return;
+                    try {
+                        const { unfollowUser } = require('../../api/followService');
+                        await unfollowUser(user.uid, post.userId);
+                        Alert.alert('Başarılı', 'Kullanıcı takipten çıkarıldı.');
+                    } catch (error) {
+                        Alert.alert('Hata', 'İşlem başarısız oldu.');
+                    }
+                }
+            }
+        ]);
+    };
+
+    const handleMorePress = () => {
+        if (!user) return;
+        setShowOptionsMenu(true);
+    };
 
     const PlatformBadge = ({ platform }: { platform: string }) => {
         if (platform === 'unknown') return null;
@@ -83,7 +128,7 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                 onLongPress={() => setRate(2.0)}
                 onPressOut={() => setRate(1.0)}
             >
-                {post.content_type === 'embed' ? (
+                {post.content_type === 'embed' && !nativeVideoUrl ? (
                     <View style={styles.video}>
                         <WebView
                             originWhitelist={['*']}
@@ -129,7 +174,7 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                         />
                         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleTap} />
                     </View>
-                ) : post.content_url ? (
+                ) : (nativeVideoUrl || post.content_url) ? (
                     <VideoView
                         player={player}
                         style={styles.video}
@@ -158,35 +203,45 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
             {/* Overlay Gradient/Shadow (Simplified) */}
             <View style={styles.overlay}>
                 {/* Right Actions */}
-                <View style={styles.rightActions}>
+                <View style={[styles.rightActions, { bottom: insets.bottom + 80 }]}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => togglePostLike(post.id, user?.uid || '')}>
-                        <Heart size={32} color={isLiked ? colors.spiceRed : '#fff'} fill={isLiked ? colors.spiceRed : 'transparent'} />
+                        <BlurView intensity={25} tint="dark" style={styles.glassActionBtn}>
+                            <Heart size={24} color={isLiked ? colors.spiceRed : '#fff'} fill={isLiked ? colors.spiceRed : 'transparent'} />
+                        </BlurView>
                         <Text style={styles.actionText}>{post.likes_count || 0}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.actionBtn} onPress={onComment}>
-                        <MessageCircle size={32} color="#fff" />
+                        <BlurView intensity={25} tint="dark" style={styles.glassActionBtn}>
+                            <MessageCircle size={22} color="#fff" />
+                        </BlurView>
                         <Text style={styles.actionText}>{post.comments_count || 0}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.actionBtn} onPress={onSave}>
-                        <Bookmark size={30} color={isSaved ? colors.saffron : '#fff'} fill={isSaved ? colors.saffron : 'transparent'} />
+                        <BlurView intensity={25} tint="dark" style={styles.glassActionBtn}>
+                            <Bookmark size={23} color={isSaved ? colors.saffron : '#fff'} fill={isSaved ? colors.saffron : 'transparent'} />
+                        </BlurView>
                         <Text style={styles.actionText}>{post.saves_count || 0}</Text>
                     </TouchableOpacity>
 
-                    {!!isOwner && (
-                        <TouchableOpacity style={styles.actionBtn} onPress={handleMorePress}>
-                            <MoreVertical size={28} color="#fff" />
-                        </TouchableOpacity>
-                    )}
+                    <TouchableOpacity style={styles.actionBtn} onPress={handleMorePress}>
+                        <BlurView intensity={25} tint="dark" style={styles.glassActionBtn}>
+                            <MoreVertical size={24} color="#fff" />
+                        </BlurView>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Bottom Info */}
-                <View style={styles.bottomInfo}>
-                    {post.content_type === 'embed' && <PlatformBadge platform={platform} />}
+                <View style={[styles.bottomInfo, { bottom: insets.bottom + 80 }]}>
+                    {post.content_type === 'embed' && (
+                        <BlurView intensity={25} tint="dark" style={[styles.pillGlassSection, { marginBottom: 8 }]}>
+                            <PlatformBadge platform={platform} />
+                        </BlurView>
+                    )}
 
                     {/* User Section */}
-                    <BlurView intensity={30} tint="dark" style={styles.floatingGlassSection}>
+                    <BlurView intensity={30} tint="dark" style={[styles.pillGlassSection, { paddingVertical: 8, paddingHorizontal: 12 }]}>
                         <View style={styles.userInfo}>
                             <TouchableOpacity
                                 style={{ flexDirection: 'row', alignItems: 'center' }}
@@ -195,14 +250,16 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                             >
                                 <UserAvatar
                                     userId={post.userId}
-                                    size={32}
+                                    size={36}
                                     style={styles.avatar}
                                 />
-                                <Text style={[styles.username, { fontFamily: typography.bodyMedium, maxWidth: width * 0.4 }]}>{post.username}</Text>
+                                <Text style={[styles.username, { fontFamily: typography.bodyMedium, maxWidth: width * 0.45 }]}>{post.username}</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.followBtn}>
-                                <Text style={styles.followText}>Takip Et</Text>
-                            </TouchableOpacity>
+                            {!isOwner && (
+                                <TouchableOpacity style={styles.followBtn}>
+                                    <Text style={styles.followText}>Takip Et</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </BlurView>
 
@@ -210,50 +267,69 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                     {!!post.caption && (
                         <TouchableOpacity
                             activeOpacity={0.9}
-                            onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}
+                            onPress={() => {
+                                if (showReadMoreButton) {
+                                    setIsCaptionExpanded(!isCaptionExpanded);
+                                }
+                            }}
+                            style={{ marginTop: 8 }}
                         >
-                            <BlurView intensity={25} tint="dark" style={[styles.floatingGlassSection, { marginTop: 8 }]}>
+                            <BlurView intensity={25} tint="dark" style={styles.pillGlassSection}>
                                 <Text
                                     style={[styles.caption, { fontFamily: typography.body, marginBottom: 0 }]}
                                     numberOfLines={isCaptionExpanded ? undefined : 2}
+                                    onTextLayout={(e) => {
+                                        if (e.nativeEvent.lines.length > 2 && !showReadMoreButton && !isCaptionExpanded) {
+                                            setShowReadMoreButton(true);
+                                        }
+                                    }}
                                 >
                                     {post.caption}
                                 </Text>
+                                {showReadMoreButton && !isCaptionExpanded && (
+                                    <Text style={{ color: colors.saffron, marginTop: 4, fontSize: 13, fontFamily: typography.bodyMedium }}>
+                                        ... devamını gör
+                                    </Text>
+                                )}
                             </BlurView>
                         </TouchableOpacity>
                     )}
 
                     {/* Food Info Section */}
                     {!!(post.cooking_time || post.difficulty || post.calories) && (
-                        <BlurView intensity={25} tint="dark" style={[styles.floatingGlassSection, { marginTop: 8 }]}>
-                            <View style={[styles.foodInfoRow, { marginBottom: 0 }]}>
-                                {!!post.cooking_time && (
-                                    <View style={styles.foodInfoItem}>
-                                        <Timer size={14} color="#fff" />
+                        <View style={[styles.foodInfoRow, { marginTop: 8 }]}>
+                            {!!post.cooking_time && (
+                                <BlurView intensity={25} tint="dark" style={styles.pillGlassSection}>
+                                    <View style={[styles.foodInfoItem, { marginBottom: 0 }]}>
+                                        <Timer size={12} color="#fff" />
                                         <Text style={styles.foodInfoText}>{post.cooking_time}</Text>
                                     </View>
-                                )}
-                                {!!post.difficulty && (
-                                    <View style={styles.foodInfoItem}>
-                                        <Gauge size={14} color="#fff" />
+                                </BlurView>
+                            )}
+                            {!!post.difficulty && (
+                                <BlurView intensity={25} tint="dark" style={styles.pillGlassSection}>
+                                    <View style={[styles.foodInfoItem, { marginBottom: 0 }]}>
+                                        <Gauge size={12} color="#fff" />
                                         <Text style={styles.foodInfoText}>{post.difficulty}</Text>
                                     </View>
-                                )}
-                                {!!post.calories && (
-                                    <View style={styles.foodInfoItem}>
-                                        <Flame size={14} color="#fff" />
+                                </BlurView>
+                            )}
+                            {!!post.calories && (
+                                <BlurView intensity={25} tint="dark" style={styles.pillGlassSection}>
+                                    <View style={[styles.foodInfoItem, { marginBottom: 0 }]}>
+                                        <Flame size={12} color="#fff" />
                                         <Text style={styles.foodInfoText}>{post.calories} kcal</Text>
                                     </View>
-                                )}
-                            </View>
-                        </BlurView>
+                                </BlurView>
+                            )}
+                        </View>
                     )}
 
                     {/* Music/Sound Section */}
-                    <TouchableOpacity style={[styles.musicContainer, { marginTop: 8 }]} onPress={() => setIsMuted(!isMuted)}>
-                        <BlurView intensity={20} tint="light" style={styles.musicBlur}>
-                            {isMuted ? <VolumeX size={14} color="#fff" /> : <Volume2 size={14} color="#fff" />}
-                            <Text style={styles.musicText}>{isMuted ? 'Ses kapalı' : 'Ses açık'}</Text>
+                    <TouchableOpacity style={{ marginTop: 8, alignSelf: 'flex-start' }} onPress={() => setIsMuted(!isMuted)}>
+                        <BlurView intensity={20} tint="light" style={[styles.pillGlassSection, { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12 }]}>
+                            {isMuted ? <VolumeX size={12} color="#fff" /> : <Volume2 size={12} color="#fff" />}
+                            <Text style={styles.musicText}>{isMuted ? 'Ses kapalı' : 'Orijinal Ses'}</Text>
                         </BlurView>
                     </TouchableOpacity>
                 </View>
@@ -263,31 +339,72 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                 visible={showOptionsMenu}
                 title="Gönderi Seçenekleri"
                 onClose={() => setShowOptionsMenu(false)}
-                options={[
+                options={isOwner ? [
                     {
                         label: 'Düzenle',
                         icon: <Pencil size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
-                        onPress: onEdit,
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            onEdit();
+                        },
                     },
                     {
                         label: 'Arşivle',
                         icon: <Archive size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
                         onPress: () => {
+                            setShowOptionsMenu(false);
                             onArchive();
                         },
                     },
                     {
                         label: 'Sil',
-                        icon: <Trash2 size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        icon: <Trash2 size={18} color={colors.spiceRed} />,
                         type: 'destructive',
                         onPress: () => {
+                            setShowOptionsMenu(false);
                             Alert.alert('Sil', 'Bu gönderiyi silmek istediğine emin misin?', [
                                 { text: 'Vazgeç', style: 'cancel' },
                                 { text: 'Sil', style: 'destructive', onPress: () => deletePost(post.id, post.userId) },
                             ]);
                         },
                     },
-                    { label: 'İptal', type: 'cancel', onPress: () => { } },
+                    { label: 'İptal', type: 'cancel', onPress: () => setShowOptionsMenu(false) },
+                ] : [
+                    {
+                        label: 'Profilini Gör',
+                        icon: <UserIcon size={18} color={theme.text} />,
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            navigation.navigate('PublicProfile', { userId: post.userId });
+                        }
+                    },
+                    {
+                        label: 'Takibi Bırak',
+                        icon: <UserMinus size={18} color={colors.spiceRed} />,
+                        type: 'destructive',
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            handleUnfollow();
+                        }
+                    },
+                    {
+                        label: 'Bu gönderiyi neden görüyorsun?',
+                        icon: <Info size={18} color={theme.text} />,
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            Alert.alert('Neden Görüyorsun?', 'Bu gönderi takip ettiğiniz veya ilgi alanlarınıza uyan hesaplara dayanarak gösterilmektedir.');
+                        }
+                    },
+                    {
+                        label: 'Şikayet Et',
+                        icon: <Flag size={18} color={colors.spiceRed} />,
+                        type: 'destructive',
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            handleReport();
+                        }
+                    },
+                    { label: 'İptal', type: 'cancel', onPress: () => setShowOptionsMenu(false) }
                 ]}
             />
         </View>
@@ -378,7 +495,7 @@ export const ReelsScreen = () => {
                 onPress={() => navigation.goBack()}
             >
                 <ArrowLeft size={28} color="#fff" />
-                <Text style={styles.reelsTitle}>Reels</Text>
+                <Text style={styles.reelsTitle}>Videolar</Text>
             </TouchableOpacity>
 
             {/* Popups */}
@@ -432,8 +549,31 @@ const styles = StyleSheet.create({
     actionText: {
         color: '#fff',
         fontSize: 12,
-        marginTop: 4,
+        marginTop: 6,
         fontWeight: '600',
+        textShadowColor: 'rgba(0,0,0,0.5)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
+    },
+    glassActionBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+    },
+    pillGlassSection: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+        backgroundColor: 'rgba(0,0,0,0.15)',
+        alignSelf: 'flex-start',
     },
     bottomInfo: {
         width: '80%',
@@ -554,24 +694,5 @@ const styles = StyleSheet.create({
     platformText: {
         fontSize: 10,
         fontWeight: '700',
-    },
-    floatingGlassSection: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 18,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
-        backgroundColor: 'rgba(0,0,0,0.15)',
-        width: width * 0.75, // Fixed width for alignment
-    },
-    musicBlur: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-        gap: 8,
-        overflow: 'hidden',
     },
 });

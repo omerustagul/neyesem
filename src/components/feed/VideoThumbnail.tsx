@@ -1,7 +1,7 @@
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import { Play } from 'lucide-react-native';
+import { Eye, Play } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, View, ViewStyle } from 'react-native';
+import { Image, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { colors } from '../../theme/colors';
 
 interface VideoThumbnailProps {
@@ -9,7 +9,15 @@ interface VideoThumbnailProps {
     thumbnailUri?: string | null;
     style?: ViewStyle;
     showPlayIcon?: boolean;
+    views?: number;
 }
+
+// Format views (e.g., 1500 -> 1.5B, 1200000 -> 1.2M)
+const formatViews = (count: number): string => {
+    if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
+    if (count >= 1000) return (count / 1000).toFixed(1) + 'B';
+    return count.toString();
+};
 
 // Simple in-memory cache for generated thumbnails
 const thumbnailCache: Record<string, string> = {};
@@ -19,6 +27,7 @@ export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
     thumbnailUri,
     style,
     showPlayIcon = true,
+    views,
 }) => {
     const [generatedUri, setGeneratedUri] = useState<string | null>(
         thumbnailUri || thumbnailCache[videoUri] || null
@@ -70,6 +79,12 @@ export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
                         </View>
                     </View>
                 )}
+                {views !== undefined && (
+                    <View style={styles.viewsContainer}>
+                        <Eye size={12} color="#fff" />
+                        <Text style={styles.viewsText}>{formatViews(views)}</Text>
+                    </View>
+                )}
             </View>
         );
     }
@@ -79,6 +94,12 @@ export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
         <View style={[styles.container, styles.placeholder, style]}>
             {showPlayIcon && (
                 <Play size={24} color="rgba(255,255,255,0.5)" fill="rgba(255,255,255,0.3)" />
+            )}
+            {views !== undefined && (
+                <View style={styles.viewsContainer}>
+                    <Eye size={12} color="#fff" />
+                    <Text style={styles.viewsText}>{formatViews(views)}</Text>
+                </View>
             )}
         </View>
     );
@@ -112,5 +133,22 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.5)',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    viewsContainer: {
+        position: 'absolute',
+        bottom: 6,
+        left: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 10,
+        gap: 4,
+    },
+    viewsText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: 'bold',
     },
 });

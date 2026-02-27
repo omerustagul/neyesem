@@ -2,7 +2,7 @@ import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { Image as ExpoImage } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Archive, ChefHat, Flame, Gauge, Instagram, MoreVertical, Music2, Pencil, Play, Timer, Trash2 } from 'lucide-react-native';
+import { Archive, ChefHat, Flag, Flame, Gauge, Info, Instagram, MoreVertical, Music2, Pencil, Play, Timer, Trash2 } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -17,6 +17,7 @@ import { colors } from '../../theme/colors';
 import { SelectionPopup } from '../common/SelectionPopup';
 import { UserAvatar } from '../common/UserAvatar';
 import { CommentButton, InfoButton, LikeButton, SaveButton } from '../social/SocialButtons';
+import { WhySeeingThisPopup } from '../social/WhySeeingThisPopup';
 
 const { width } = Dimensions.get('window');
 
@@ -29,6 +30,10 @@ interface VideoPostCardProps {
     onShare: () => void;
     isVisible?: boolean;
     isMutedOverride?: boolean;
+    isFollowing?: boolean;
+    onToggleFollow?: () => void;
+    hasActiveStory?: boolean;
+    onOpenStory?: () => void;
 }
 
 export const VideoPostCard: React.FC<VideoPostCardProps> = ({
@@ -39,7 +44,11 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
     onSave,
     onShare,
     isVisible = true,
-    isMutedOverride = false
+    isMutedOverride = false,
+    isFollowing = false,
+    hasActiveStory = false,
+    onToggleFollow,
+    onOpenStory
 }) => {
     const { theme, typography, isDark } = useTheme();
     const navigation = useNavigation<any>();
@@ -49,13 +58,15 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
     const handleLikeWithXP = () => { onLike?.(); if (user?.uid) addXP(user.uid, 1); };
     const handleCommentWithXP = () => { onComment?.(); if (user?.uid) addXP(user.uid, 3); };
     const handleSaveWithXP = () => { onSave?.(); if (user?.uid) addXP(user.uid, 1); };
-    const { embedHtml, platform, isLoading, error } = useEmbed(post.content_url || '');
+    const { embedHtml, nativeVideoUrl, platform, isLoading, error } = useEmbed(post.content_url || '');
     const [playbackRate, setPlaybackRate] = useState(1.0);
     const [isPaused, setIsPaused] = useState(false);
+    const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
+    const [showReadMoreButton, setShowReadMoreButton] = useState(false);
 
     // Initialize expo-video player
-    const isVideo = post.content_type === 'video' || (!post.content_type && post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$|firebase-storage/i));
-    const player = useVideoPlayer(isVideo ? post.content_url || '' : '', (player: any) => {
+    const isVideo = post.content_type === 'video' || (!post.content_type && post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$|firebase-storage/i)) || !!nativeVideoUrl;
+    const player = useVideoPlayer(isVideo ? (nativeVideoUrl || post.content_url || '') : '', (player: any) => {
         player.loop = true;
     });
 
@@ -107,9 +118,9 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
     };
 
     const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+    const [showWhyPopup, setShowWhyPopup] = useState(false);
 
     const handleMorePress = () => {
-        if (!isOwner) return;
         setShowOptionsMenu(true);
     };
 
@@ -122,7 +133,7 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
             );
         }
 
-        if (post.content_type === 'embed') {
+        if (post.content_type === 'embed' && !nativeVideoUrl) {
             if (isLoading) {
                 return (
                     <View style={[styles.mediaPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
@@ -199,7 +210,7 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
             );
         }
 
-        // Default to video if content_url exists and it's not embed
+        // Default to video if content_url or nativeVideoUrl exists
         return (
             <TouchableOpacity
                 style={styles.mediaContainer}
@@ -260,17 +271,28 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
         >
             {/* Header */}
             <View style={styles.header}>
-                <BlurView intensity={20} tint={isDark ? 'dark' : 'light'} style={styles.headerGlass}>
+                <BlurView intensity={20} tint={isDark ? 'dark' : 'light'} style={[styles.headerGlass, { borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
                     <TouchableOpacity
                         style={[styles.userInfo, { flex: 1 }]}
-                        onPress={() => navigation.navigate('PublicProfile', { userId: post.userId })}
+                        onPress={() => {
+                            if (hasActiveStory && onOpenStory) {
+                                onOpenStory();
+                            } else {
+                                navigation.navigate('PublicProfile', { userId: post.userId });
+                            }
+                        }}
                         activeOpacity={0.7}
                     >
-                        <UserAvatar
-                            userId={post.userId}
-                            size={38}
-                            style={styles.avatar}
-                        />
+                        <View style={[
+                            styles.avatarRing,
+                            hasActiveStory && { borderColor: colors.saffron, borderWidth: 2 }
+                        ]}>
+                            <UserAvatar
+                                userId={post.userId}
+                                size={34}
+                                style={styles.avatar}
+                            />
+                        </View>
                         <View>
                             <Text style={[styles.username, { color: theme.text, fontFamily: typography.bodyMedium }]}>
                                 {post.display_name || post.username}
@@ -280,11 +302,9 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
 
                     {post.content_type === 'embed' && <PlatformBadge platform={platform} />}
 
-                    {isOwner && (
-                        <TouchableOpacity onPress={handleMorePress} style={styles.moreButton}>
-                            <MoreVertical size={20} color={theme.secondaryText} />
-                        </TouchableOpacity>
-                    )}
+                    <TouchableOpacity onPress={handleMorePress} style={styles.moreButton}>
+                        <MoreVertical size={20} color={theme.secondaryText} />
+                    </TouchableOpacity>
                 </BlurView>
             </View>
 
@@ -306,11 +326,35 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
             {/* Post Caption */}
             {!!post.caption && (
                 <View style={styles.captionContainer}>
-                    <BlurView intensity={15} tint={isDark ? 'dark' : 'light'} style={styles.captionGlass}>
-                        <Text style={[styles.caption, { color: theme.text, fontFamily: typography.body }]}>
-                            <Text style={{ fontFamily: typography.bodyMedium }}>{post.username}{' '}</Text>
-                            {post.caption}
-                        </Text>
+                    <BlurView intensity={15} tint={isDark ? 'dark' : 'light'} style={[styles.captionGlass, { borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() => {
+                                if (showReadMoreButton) {
+                                    setIsCaptionExpanded(!isCaptionExpanded);
+                                }
+                            }}
+                        >
+                            <Text
+                                style={[styles.caption, { color: theme.text, fontFamily: typography.body }]}
+                                numberOfLines={isCaptionExpanded ? undefined : 2}
+                                onTextLayout={(e) => {
+                                    // React Native has a bug where lines are all measured even when hidden, but 
+                                    // if it's over 2, we should show the button
+                                    if (e.nativeEvent.lines.length > 2 && !showReadMoreButton && !isCaptionExpanded) {
+                                        setShowReadMoreButton(true);
+                                    }
+                                }}
+                            >
+                                <Text style={{ fontFamily: typography.bodyMedium }}>{post.username}{' '}</Text>
+                                {post.caption}
+                            </Text>
+                            {showReadMoreButton && !isCaptionExpanded && (
+                                <Text style={{ color: colors.saffron, marginTop: 4, fontSize: 13, fontFamily: typography.bodyMedium }}>
+                                    ... devamını gör
+                                </Text>
+                            )}
+                        </TouchableOpacity>
                     </BlurView>
                 </View>
             )}
@@ -338,17 +382,24 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
             <SelectionPopup
                 visible={showOptionsMenu}
                 title="Gönderi Seçenekleri"
-                onClose={() => setShowOptionsMenu(false)}
-                options={[
+                onClose={() => {
+                    setShowOptionsMenu(false);
+                    setTimeout(() => setShowWhyPopup(false), 300);
+                }}
+                options={isOwner ? [
                     {
                         label: 'Düzenle',
                         icon: <Pencil size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
-                        onPress: () => navigation.navigate('EditPost', { post }),
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            navigation.navigate('EditPost', { post });
+                        },
                     },
                     {
                         label: 'Arşivle',
                         icon: <Archive size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
                         onPress: () => {
+                            setShowOptionsMenu(false);
                             archivePost(post.id);
                             Alert.alert('Arşivlendi', 'Gönderi arşive taşındı.');
                         },
@@ -358,6 +409,7 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
                         icon: <Trash2 size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
                         type: 'destructive',
                         onPress: () => {
+                            setShowOptionsMenu(false);
                             Alert.alert('Sil', 'Bu gönderiyi silmek istediğine emin misin?', [
                                 { text: 'Vazgeç', style: 'cancel' },
                                 { text: 'Sil', style: 'destructive', onPress: () => deletePost(post.id, post.userId) },
@@ -365,7 +417,49 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
                         },
                     },
                     { label: 'İptal', type: 'cancel', onPress: () => { } },
+                ] : [
+                    {
+                        label: 'Profilini Gör',
+                        icon: <UserAvatar userId={post.userId} size={18} />,
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            navigation.navigate('PublicProfile', { userId: post.userId });
+                        },
+                    },
+                    {
+                        label: isFollowing ? 'Takibi Bırak' : 'Takip Et',
+                        icon: <ChefHat size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            if (onToggleFollow) onToggleFollow();
+                        },
+                    },
+                    {
+                        label: 'Bu gönderiyi neden görüyorsun?',
+                        icon: <Info size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        onPress: () => {
+                            setShowWhyPopup(true);
+                        },
+                    },
+                    {
+                        label: 'Şikayet Et',
+                        icon: <Flag size={18} color={colors.spiceRed} />,
+                        type: 'destructive',
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            Alert.alert('Şikayetiniz Alındı', 'Bu gönderiyi inceleyeceğiz. Teşekkür ederiz.');
+                        },
+                    },
+                    { label: 'İptal', type: 'cancel', onPress: () => { } },
                 ]}
+                showCustomContent={showWhyPopup}
+                customContent={
+                    <WhySeeingThisPopup
+                        username={post.username || 'Kullanıcı'}
+                        isFollowing={isFollowing}
+                        onBack={() => setShowWhyPopup(false)}
+                    />
+                }
             />
         </MotiView>
     );
@@ -384,14 +478,20 @@ const styles = StyleSheet.create({
     userInfo: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 10,
+    },
+    avatarRing: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        padding: 2,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     avatar: {
-        width: 38,
-        height: 38,
+        width: '100%',
+        height: '100%',
         borderRadius: 19,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 10,
     },
     username: {
         fontSize: 14,
