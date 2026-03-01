@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Keyboard, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Portal } from 'react-native-paper';
 import { UserList, createList, getListsContainingPost, subscribeToUserLists, togglePostInList } from '../../api/listService';
+import { ensurePostSaved } from '../../api/postService';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
@@ -45,6 +46,10 @@ export const SavePopup: React.FC<SavePopupProps> = ({ postId, onClose }) => {
                 setSavedListIds(prev => prev.filter(id => id !== listId));
             } else {
                 setSavedListIds(prev => [...prev, listId]);
+                // Ensure post is saved in "All Saved"
+                if (user?.uid) {
+                    await ensurePostSaved(user.uid, postId);
+                }
             }
         } catch (error) {
             Alert.alert('Hata', 'Liste güncellenemedi.');
@@ -57,6 +62,9 @@ export const SavePopup: React.FC<SavePopupProps> = ({ postId, onClose }) => {
             const newListId = await createList(user.uid, newListTitle.trim());
             await togglePostInList(newListId, postId, true);
             setSavedListIds(prev => [...prev, newListId]);
+
+            // Ensure post is saved in "All Saved"
+            await ensurePostSaved(user.uid, postId);
             setNewListTitle('');
             setIsCreating(false);
             Keyboard.dismiss();

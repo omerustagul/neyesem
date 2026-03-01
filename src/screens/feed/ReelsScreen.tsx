@@ -1,12 +1,13 @@
 import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Archive, ArrowLeft, Bookmark, Flag, Flame, Gauge, Heart, Info, Instagram, MessageCircle, MoreVertical, Music2, Pencil, Play, Timer, Trash2, User as UserIcon, UserMinus, Volume2, VolumeX } from 'lucide-react-native';
+import { Archive, ArrowLeft, Bookmark, ChefHat, Flag, Flame, Gauge, Heart, Info, Instagram, MessageCircle, MoreVertical, Music2, Pencil, Play, Timer, Trash2, User as UserIcon, UserMinus, Volume2, VolumeX } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, FlatList, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { archivePost, deletePost, Post, subscribeToFeedPosts, togglePostLike } from '../../api/postService';
+import { GradientText } from '../../components/common/GradientText';
 import { SelectionPopup } from '../../components/common/SelectionPopup';
 import { UserAvatar } from '../../components/common/UserAvatar';
 import { CommentsPopup } from '../../components/social/CommentsPopup';
@@ -39,6 +40,8 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
     const isVideo = post.content_type === 'video' || (!post.content_type && post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$|firebase-storage/i)) || !!nativeVideoUrl;
     const player = useVideoPlayer(isVideo ? (nativeVideoUrl || post.content_url || '') : 'https://assets.mixkit.co/videos/preview/mixkit-transparent-water-in-slow-motion-44391-preview.mp4', (player: any) => {
         player.loop = true;
+        player.muted = true; // start muted
+        player.pause(); // ensure it starts paused
     });
 
     useEffect(() => {
@@ -50,9 +53,9 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
     }, [isActive, isPaused, isScreenFocused, player]);
 
     useEffect(() => {
-        player.muted = !isScreenFocused || isMuted;
+        player.muted = !isActive || !isScreenFocused || isMuted;
         player.playbackRate = rate;
-    }, [isScreenFocused, isMuted, rate, player]);
+    }, [isActive, isScreenFocused, isMuted, rate, player]);
 
     const handleTap = () => {
         setIsPaused(!isPaused);
@@ -234,6 +237,57 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
 
                 {/* Bottom Info */}
                 <View style={[styles.bottomInfo, { bottom: insets.bottom + 80 }]}>
+                    {/* Food Info Section (Moved to top) */}
+                    {!!(post.cooking_time || post.difficulty || post.calories || post.protein) && (
+                        <View style={{ marginBottom: 12 }}>
+                            {/* Visual wrapper for Food Info */}
+                            <BlurView intensity={50} tint="dark" style={[styles.pillGlassSection, { backgroundColor: 'rgba(255, 178, 0, 0.15)', borderColor: 'rgba(255, 178, 0, 0.3)', paddingHorizontal: 12, paddingVertical: 10, alignSelf: 'stretch' }]}>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 10 }}>
+                                    {!!post.cooking_time && (
+                                        <View style={styles.foodInfoItem}>
+                                            <Timer size={14} color="#fff" />
+                                            <Text style={styles.foodInfoText}>{post.cooking_time}</Text>
+                                        </View>
+                                    )}
+                                    {!!post.difficulty && (
+                                        <View style={styles.foodInfoItem}>
+                                            <Gauge size={14} color="#fff" />
+                                            <Text style={styles.foodInfoText}>{post.difficulty}</Text>
+                                        </View>
+                                    )}
+                                    {!!post.calories && (
+                                        <View style={styles.foodInfoItem}>
+                                            <Flame size={14} color="#fff" />
+                                            <Text style={styles.foodInfoText}>{post.calories} kcal</Text>
+                                        </View>
+                                    )}
+                                    {!!post.protein && (
+                                        <View style={styles.foodInfoItem}>
+                                            <ChefHat size={14} color="#fff" />
+                                            <Text style={styles.foodInfoText}>{post.protein}</Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    style={styles.foodDetailBtn}
+                                    onPress={() => navigation.navigate('FoodDetail', { post: post })}
+                                >
+                                    <ChefHat size={16} color={colors.saffron} />
+                                    <GradientText
+                                        colors={[colors.saffron, colors.spiceRed]}
+                                        style={styles.foodDetailBtnText}
+                                        start={{ x: 0, y: 0.5 }}
+                                        end={{ x: 1, y: 0.5 }}
+                                    >
+                                        Yemek Hakkında
+                                    </GradientText>
+                                </TouchableOpacity>
+                            </BlurView>
+                        </View>
+                    )}
+
                     {post.content_type === 'embed' && (
                         <BlurView intensity={25} tint="dark" style={[styles.pillGlassSection, { marginBottom: 8 }]}>
                             <PlatformBadge platform={platform} />
@@ -294,37 +348,6 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                             </BlurView>
                         </TouchableOpacity>
                     )}
-
-                    {/* Food Info Section */}
-                    {!!(post.cooking_time || post.difficulty || post.calories) && (
-                        <View style={[styles.foodInfoRow, { marginTop: 8 }]}>
-                            {!!post.cooking_time && (
-                                <BlurView intensity={25} tint="dark" style={styles.pillGlassSection}>
-                                    <View style={[styles.foodInfoItem, { marginBottom: 0 }]}>
-                                        <Timer size={12} color="#fff" />
-                                        <Text style={styles.foodInfoText}>{post.cooking_time}</Text>
-                                    </View>
-                                </BlurView>
-                            )}
-                            {!!post.difficulty && (
-                                <BlurView intensity={25} tint="dark" style={styles.pillGlassSection}>
-                                    <View style={[styles.foodInfoItem, { marginBottom: 0 }]}>
-                                        <Gauge size={12} color="#fff" />
-                                        <Text style={styles.foodInfoText}>{post.difficulty}</Text>
-                                    </View>
-                                </BlurView>
-                            )}
-                            {!!post.calories && (
-                                <BlurView intensity={25} tint="dark" style={styles.pillGlassSection}>
-                                    <View style={[styles.foodInfoItem, { marginBottom: 0 }]}>
-                                        <Flame size={12} color="#fff" />
-                                        <Text style={styles.foodInfoText}>{post.calories} kcal</Text>
-                                    </View>
-                                </BlurView>
-                            )}
-                        </View>
-                    )}
-
                     {/* Music/Sound Section */}
                     <TouchableOpacity style={{ marginTop: 8, alignSelf: 'flex-start' }} onPress={() => setIsMuted(!isMuted)}>
                         <BlurView intensity={20} tint="light" style={[styles.pillGlassSection, { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12 }]}>
@@ -641,20 +664,26 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: 'bold',
     },
-    foodInfoRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-        marginBottom: 12,
-    },
     foodInfoItem: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+    },
+    foodDetailBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(255, 178, 0, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 178, 0, 0.3)',
+        paddingVertical: 8,
         borderRadius: 12,
+    },
+    foodDetailBtnText: {
+        color: colors.saffron,
+        fontSize: 13,
+        fontWeight: 'bold',
     },
     foodInfoText: {
         color: '#fff',

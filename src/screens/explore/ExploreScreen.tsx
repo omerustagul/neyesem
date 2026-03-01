@@ -1,9 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { ChevronRight, Clock, Coffee, Globe, Info, Leaf, MapPin, Search, Sparkles, User, UtensilsCrossed, Wine, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Post } from '../../api/postService';
+import { getPopularPosts, Post } from '../../api/postService';
 import { searchPosts, searchUsers, UserProfile } from '../../api/searchService';
 import { SeasonalCompass } from '../../components/explore/SeasonalCompass';
 import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
@@ -14,10 +15,10 @@ import { colors } from '../../theme/colors';
 const { width } = Dimensions.get('window');
 
 const QUICK_ACTIONS = [
-    { id: 'mood', title: 'Modlar', icon: Sparkles, color: '#f43f5e', subtitle: 'Ruh halin' },
-    { id: 'cuisine', title: 'Mutfaklar', icon: Globe, color: '#8b5cf6', subtitle: 'Dünya lezzetleri' },
-    { id: 'tips', title: 'Püf Noktalar', icon: Info, color: '#0ea5e9', subtitle: 'Mutfak sırları' },
-    { id: 'trend', title: 'Trendler', icon: Clock, color: '#f59e0b', subtitle: 'Popüler tarifler' },
+    { id: 'mood', title: 'Modlar', icon: Sparkles, color: '#f43f5e', subtitle: 'Ruh haline uygun lezzetleri keşfet' },
+    { id: 'cuisine', title: 'Mutfaklar', icon: Globe, color: '#8b5cf6', subtitle: 'Dünya mutfaklarını keşfet' },
+    { id: 'tips', title: 'Püf Noktalar', icon: Info, color: '#0ea5e9', subtitle: 'Mutfak sırlarını ve püf noktalarını keşfet' },
+    { id: 'trend', title: 'Trendler', icon: Clock, color: '#f59e0b', subtitle: 'Popüler lezzetleri ve tarifleri keşfet' },
 ];
 
 const QUICK_CATEGORIES = [
@@ -51,13 +52,39 @@ export const ExploreScreen = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<{ users: UserProfile[], posts: Post[] }>({ users: [], posts: [] });
-    const [searchHistory, setSearchHistory] = useState<string[]>(['Pizza', 'Burger', 'Healthy']);
+    const [searchHistory, setSearchHistory] = useState<string[]>([]);
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isSeasonModalVisible, setIsSeasonModalVisible] = useState(false);
     const [isMoodsModalVisible, setIsMoodsModalVisible] = useState(false);
     const [isCuisinesModalVisible, setIsCuisinesModalVisible] = useState(false);
+    const [popularPosts, setPopularPosts] = useState<Post[]>([]);
+    const [isLoadingPopular, setIsLoadingPopular] = useState(true);
 
     const headerHeight = 52 + insets.top;
+
+    const fetchPopularData = async () => {
+        setIsLoadingPopular(true);
+        const posts = await getPopularPosts(10);
+        setPopularPosts(posts);
+        setIsLoadingPopular(false);
+    };
+
+    useEffect(() => {
+        fetchPopularData();
+        loadSearchHistory();
+    }, []);
+
+    const loadSearchHistory = async () => {
+        try {
+            const savedHistory = await AsyncStorage.getItem('@explore_search_history');
+            if (savedHistory) {
+                setSearchHistory(JSON.parse(savedHistory));
+            }
+        } catch (e) {
+            console.error('Failed to load search history.', e);
+        }
+    };
 
     useEffect(() => {
         const timer = setTimeout(async () => {
@@ -77,18 +104,25 @@ export const ExploreScreen = () => {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    const addToHistory = (term: string) => {
+    const addToHistory = async (term: string) => {
         if (!term) return;
         setSearchHistory(prev => {
             const doubleRemoved = prev.filter(t => t.toLowerCase() !== term.toLowerCase());
-            return [term, ...doubleRemoved].slice(0, 5);
+            const newHistory = [term, ...doubleRemoved].slice(0, 5);
+            AsyncStorage.setItem('@explore_search_history', JSON.stringify(newHistory)).catch(e => console.error(e));
+            return newHistory;
         });
     };
 
-    const onRefresh = React.useCallback(() => {
+    const clearHistory = async () => {
+        setSearchHistory([]);
+        await AsyncStorage.removeItem('@explore_search_history');
+    };
+
+    const onRefresh = React.useCallback(async () => {
         setIsRefreshing(true);
-        // Simulate refresh for now as it's static data
-        setTimeout(() => setIsRefreshing(false), 1500);
+        await fetchPopularData();
+        setIsRefreshing(false);
     }, []);
 
     return (
@@ -137,6 +171,8 @@ export const ExploreScreen = () => {
                         <TextInput
                             value={searchQuery}
                             onChangeText={setSearchQuery}
+                            onFocus={() => setIsSearchFocused(true)}
+                            onBlur={() => setIsSearchFocused(false)}
                             placeholder="Kişi, yiyecek veya tarif ara..."
                             placeholderTextColor={theme.secondaryText}
                             style={[styles.searchInput, { color: theme.text, fontFamily: typography.body }]}
@@ -223,13 +259,13 @@ export const ExploreScreen = () => {
                 ) : (
                     <>
                         {/* Search History */}
-                        {!!(searchHistory.length > 0) && (
+                        {!!(isSearchFocused && searchHistory.length > 0) && (
                             <View style={styles.historySection}>
                                 <View style={styles.historyHeader}>
                                     <Text style={[styles.sectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
                                         GEÇMİŞ ARAMALAR
                                     </Text>
-                                    <TouchableOpacity onPress={() => setSearchHistory([])}>
+                                    <TouchableOpacity onPress={clearHistory}>
                                         <Text style={{ color: colors.saffron, fontSize: 12, fontFamily: typography.bodyMedium }}>Temizle</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -263,7 +299,7 @@ export const ExploreScreen = () => {
                                         Mevsim Takvimi
                                     </Text>
                                     <Text style={[styles.seasonBannerSub, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                                        Bu ay hangi ürünler taze tüketilmeli? Öğrenmek için tıkla.
+                                        Bu ay hangi ürünler tüketilmeli? Öğrenmek için tıkla.
                                     </Text>
                                 </View>
                                 <ChevronRight size={20} color={theme.secondaryText} style={{ marginLeft: 10 }} />
@@ -308,27 +344,40 @@ export const ExploreScreen = () => {
                             })}
                         </View>
 
-                        {/* Top Categories */}
+                        {/* Top Recipes */}
                         <View style={{ marginTop: 24 }}>
                             <Text style={[styles.sectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium, marginBottom: 12 }]}>
-                                POPÜLER KATEGORİLER
+                                POPÜLER TARİFLER
                             </Text>
-                            <View style={styles.chipGrid}>
-                                {QUICK_CATEGORIES.map(cat => (
-                                    <TouchableOpacity
-                                        key={cat.id}
-                                        activeOpacity={0.7}
-                                        style={[styles.categoryChip, { backgroundColor: isDark ? 'rgba(255,178,0,0.1)' : 'rgba(255,178,0,0.05)' }]}
-                                    >
-                                        <Text style={[styles.categoryChipTitle, { color: colors.saffron, fontFamily: typography.bodyMedium }]}>
-                                            {cat.title}
-                                        </Text>
-                                        <View style={styles.categoryChipBadge}>
-                                            <Text style={styles.categoryChipCount}>{cat.count}</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
+
+                            {isLoadingPopular ? (
+                                <View style={{ padding: 20, alignItems: 'center' }}>
+                                    <ActivityIndicator color={colors.saffron} />
+                                </View>
+                            ) : (
+                                <View style={styles.postsGrid}>
+                                    {popularPosts.map(post => (
+                                        <TouchableOpacity
+                                            key={post.id}
+                                            style={styles.postResultItem}
+                                            onPress={() => {
+                                                navigation.navigate('Reels', { initialPostId: post.id });
+                                            }}
+                                        >
+                                            <VideoThumbnail
+                                                videoUri={post.content_url || ''}
+                                                thumbnailUri={post.thumbnail_url}
+                                                style={styles.resultPostImage}
+                                                showPlayIcon={post.content_type === 'video' || post.content_type === 'embed' || !!post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$/i)}
+                                                views={post.views || 0}
+                                            />
+                                            <Text style={[styles.postCaption, { color: theme.text, fontFamily: typography.body }]} numberOfLines={1}>
+                                                {post.caption}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
                         </View>
                     </>
                 )}
@@ -544,10 +593,10 @@ const styles = StyleSheet.create({
     postsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        justifyContent: 'space-between',
     },
     postResultItem: {
-        width: (width - 48) / 2,
+        width: (width - 40) / 2,
         marginBottom: 8,
     },
     resultPostImage: {

@@ -1,6 +1,7 @@
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { Image as ExpoImage } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Archive, ChefHat, Flag, Flame, Gauge, Info, Instagram, MoreVertical, Music2, Pencil, Play, Timer, Trash2 } from 'lucide-react-native';
 import { MotiView } from 'moti';
@@ -8,7 +9,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { sendPalateSignal } from '../../api/palateService';
-import { archivePost, deletePost, Post } from '../../api/postService';
+import { archivePost, deletePost, Post, recordPostView } from '../../api/postService';
 import { useEmbed } from '../../hooks/useEmbed';
 import { useAuthStore } from '../../store/authStore';
 import { useLevelStore } from '../../store/levelStore';
@@ -68,6 +69,8 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
     const isVideo = post.content_type === 'video' || (!post.content_type && post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$|firebase-storage/i)) || !!nativeVideoUrl;
     const player = useVideoPlayer(isVideo ? (nativeVideoUrl || post.content_url || '') : '', (player: any) => {
         player.loop = true;
+        player.muted = true; // Start muted to prevent background audio bleeding on list init
+        player.pause();
     });
 
     useEffect(() => {
@@ -85,31 +88,48 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
 
     const isOwner = user?.uid === post.userId;
     const viewStartTime = useRef<number | null>(null);
+    const viewTimerRef = useRef<any>(null);
+    const hasViewedRef = useRef<boolean>(false);
 
     useEffect(() => {
         if (isVisible && isFocused && !isPaused) {
-            viewStartTime.current = Date.now();
-        } else if (viewStartTime.current) {
-            const duration = Date.now() - viewStartTime.current;
-            if (user && duration > 500) { // Ignore micro-views
-                const type = duration < 3000 ? 'view_under_3s' :
-                    duration < 10000 ? 'view_3_to_10s' : 'view_over_10s';
-                sendPalateSignal(user.uid, type, post.id, post.tags || []);
+            // Start the view timer when the video becomes active
+            if (!hasViewedRef.current && user) {
+                viewStartTime.current = Date.now();
+
+                viewTimerRef.current = setTimeout(() => {
+                    // Video played for 3 continuous seconds, count it as a view
+                    recordPostView(post.id, user.uid);
+                    hasViewedRef.current = true; // Prevents multiple increments per scroll session
+
+                    // Also trigger Palate Signal for 3+ seconds
+                    sendPalateSignal(user.uid, 'view_3_to_10s', post.id, post.tags || []);
+                }, 3000);
+            }
+        } else {
+            // Video paused or hidden before 3 seconds
+            if (viewTimerRef.current) {
+                clearTimeout(viewTimerRef.current);
+                viewTimerRef.current = null;
+            }
+
+            // Still track micro-views for ML/Discovery (Palate Signal) if it was less than 3s
+            if (viewStartTime.current && user && !hasViewedRef.current) {
+                const duration = Date.now() - viewStartTime.current;
+                if (duration > 500 && duration < 3000) {
+                    sendPalateSignal(user.uid, 'view_under_3s', post.id, post.tags || []);
+                }
             }
             viewStartTime.current = null;
+            hasViewedRef.current = false; // Reset for next time they scroll away and back
         }
 
         return () => {
-            if (viewStartTime.current && user) {
-                const duration = Date.now() - viewStartTime.current;
-                if (duration > 500) {
-                    const type = duration < 3000 ? 'view_under_3s' :
-                        duration < 10000 ? 'view_3_to_10s' : 'view_over_10s';
-                    sendPalateSignal(user.uid, type, post.id, post.tags || []);
-                }
+            if (viewTimerRef.current) {
+                clearTimeout(viewTimerRef.current);
             }
         };
-    }, [isVisible, isFocused, isPaused]);
+    }, [isVisible, isFocused, isPaused, user, post.id, post.tags]);
 
     const handlePressMedia = () => {
         if (post.content_type === 'video' || post.content_type === 'embed') {
@@ -253,9 +273,9 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
         if (platform === 'unknown') return null;
         const isInstagram = platform === 'instagram';
         return (
-            <View style={[styles.platformBadge, { backgroundColor: isInstagram ? '#E1306C20' : '#00000020' }]}>
-                {isInstagram ? <Instagram size={12} color="#E1306C" /> : <Music2 size={12} color={theme.text} />}
-                <Text style={[styles.platformText, { color: isInstagram ? '#E1306C' : theme.text }]}>
+            <View style={[styles.platformBadge, { backgroundColor: isInstagram ? 'rgba(225, 48, 108, 0.4)' : 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: isInstagram ? 'rgba(225, 48, 108, 0.3)' : 'rgba(255,255,255,0.2)' }]}>
+                {isInstagram ? <Instagram size={12} color="#FFFFFF" /> : <Music2 size={12} color="#FFFFFF" />}
+                <Text style={[styles.platformText, { color: '#FFFFFF' }]}>
                     {isInstagram ? 'Instagram' : 'TikTok'}
                 </Text>
             </View>
@@ -269,47 +289,55 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
             transition={{ type: 'timing', duration: 500 }}
             style={[styles.container, { backgroundColor: theme.background }]}
         >
-            {/* Header */}
-            <View style={styles.header}>
-                <BlurView intensity={20} tint={isDark ? 'dark' : 'light'} style={[styles.headerGlass, { borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-                    <TouchableOpacity
-                        style={[styles.userInfo, { flex: 1 }]}
-                        onPress={() => {
-                            if (hasActiveStory && onOpenStory) {
-                                onOpenStory();
-                            } else {
-                                navigation.navigate('PublicProfile', { userId: post.userId });
-                            }
-                        }}
-                        activeOpacity={0.7}
-                    >
-                        <View style={[
-                            styles.avatarRing,
-                            hasActiveStory && { borderColor: colors.saffron, borderWidth: 2 }
-                        ]}>
-                            <UserAvatar
-                                userId={post.userId}
-                                size={34}
-                                style={styles.avatar}
-                            />
-                        </View>
-                        <View>
-                            <Text style={[styles.username, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                {post.display_name || post.username}
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
+            {/* Media Content with Header Overlay */}
+            <View style={styles.mediaWrapper}>
+                {renderMedia()}
 
-                    {post.content_type === 'embed' && <PlatformBadge platform={platform} />}
+                <View style={styles.headerOverlayContainer} pointerEvents="box-none">
+                    <LinearGradient
+                        colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.0)', 'rgba(0,0,0,0)']}
+                        locations={[0, 0.5, 1]}
+                        style={styles.headerGradient}
+                        pointerEvents="none"
+                    />
+                    <View style={styles.headerOverlayContent} pointerEvents="box-none">
+                        <TouchableOpacity
+                            style={[styles.userInfo, { flex: 1 }]}
+                            onPress={() => {
+                                if (hasActiveStory && onOpenStory) {
+                                    onOpenStory();
+                                } else {
+                                    navigation.navigate('PublicProfile', { userId: post.userId });
+                                }
+                            }}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[
+                                styles.avatarRing,
+                                hasActiveStory && { borderColor: colors.saffron, borderWidth: 2 }
+                            ]}>
+                                <UserAvatar
+                                    userId={post.userId}
+                                    size={34}
+                                    style={styles.avatar}
+                                />
+                            </View>
+                            <View>
+                                {/* Text styled cleanly on overlay */}
+                                <Text style={[styles.username, { color: '#FFFFFF', fontFamily: typography.bodyMedium, textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }]}>
+                                    {post.display_name || post.username}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
 
-                    <TouchableOpacity onPress={handleMorePress} style={styles.moreButton}>
-                        <MoreVertical size={20} color={theme.secondaryText} />
-                    </TouchableOpacity>
-                </BlurView>
+                        {post.content_type === 'embed' && <PlatformBadge platform={platform} />}
+
+                        <TouchableOpacity onPress={handleMorePress} style={styles.moreButton}>
+                            <MoreVertical size={20} color="#FFFFFF" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
             </View>
-
-            {/* Media Content */}
-            {renderMedia()}
 
             {/* Interaction Buttons */}
             <View style={styles.actions}>
@@ -470,7 +498,28 @@ const styles = StyleSheet.create({
         width: width,
         marginBottom: 8,
     },
-    header: {
+    mediaWrapper: {
+        position: 'relative',
+        width: width,
+    },
+    headerOverlayContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 12,
+        right: 12,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        overflow: 'hidden',
+        zIndex: 10,
+    },
+    headerGradient: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 120, // Increased height for a smoother transition
+    },
+    headerOverlayContent: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 12,
@@ -512,7 +561,7 @@ const styles = StyleSheet.create({
         width: width - 24,
         marginHorizontal: 12,
         borderRadius: 24,
-        aspectRatio: 0.75, // 4:3 Ratio (Instagram Style)
+        aspectRatio: 0.7, // 4:3 Ratio (Instagram Style)
         backgroundColor: 'rgba(0,0,0,0.05)',
         position: 'relative',
         overflow: 'hidden',

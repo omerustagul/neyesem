@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { View, Text, StyleSheet } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import UsernameInputWithAvailability from '../../components/common/UsernameInputWithAvailability'
 
 // Simple usage example for integrating UsernameInputWithAvailability
@@ -14,6 +14,6 @@ export default function EditProfileUsernameExample() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
+  container: { padding: 16, },
   label: { fontSize: 14, marginBottom: 8 }
 })

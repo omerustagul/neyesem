@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     sectionCard: {
-        borderRadius: 18,
+        borderRadius: 28,
         marginBottom: 8,
         overflow: 'hidden',
     },

@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     ingredientCard: {
         flex: 1,
         margin: 4,
-        padding: 16,
+        padding: 12,
         borderRadius: 20,
         borderWidth: 1,
         flexDirection: 'row',

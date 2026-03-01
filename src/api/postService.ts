@@ -149,6 +149,33 @@ export const getFeedPosts = async (limitCount: number = 20): Promise<Post[]> => 
     }
 };
 
+// Get popular posts sorted by engagement
+export const getPopularPosts = async (limitCount: number = 10): Promise<Post[]> => {
+    try {
+        // Fetch a broader set of recent posts to rank in memory
+        const q = query(collection(db, 'posts'));
+        const snapshot = await getDocs(q);
+        const posts = snapshot.docs
+            .map((docSnap) => ({
+                id: docSnap.id,
+                ...docSnap.data(),
+            } as Post))
+            .filter(p => !p.is_archived);
+
+        // Sort by engagement: Views + (Likes * 2) + (Comments * 3)
+        const sortedPosts = posts.sort((a, b) => {
+            const scoreA = (a.views || 0) + ((a.likes_count || 0) * 2) + ((a.comments_count || 0) * 3);
+            const scoreB = (b.views || 0) + ((b.likes_count || 0) * 2) + ((b.comments_count || 0) * 3);
+            return scoreB - scoreA;
+        });
+
+        return sortedPosts.slice(0, limitCount);
+    } catch (error) {
+        console.error('Error fetching popular posts:', error);
+        return [];
+    }
+};
+
 // Real-time listener for user posts
 export const subscribeToUserPosts = (
     userId: string,
@@ -518,6 +545,69 @@ export const savePostForUser = async (userId: string, postId: string) => {
     }
 };
 
+// Ensure a post is generally saved and its saves_count is properly updated
+export const ensurePostSaved = async (userId: string, postId: string): Promise<void> => {
+    try {
+        const postRef = doc(db, 'posts', postId);
+        const postSnap = await getDoc(postRef);
+
+        if (postSnap.exists()) {
+            const post = postSnap.data() as Post;
+            const savedBy = post.saved_by || [];
+
+            if (!savedBy.includes(userId)) {
+                await updateDoc(postRef, {
+                    saved_by: arrayUnion(userId),
+                    saves_count: increment(1),
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error ensuring post is saved:', error);
+    }
+};
+
+// Record a post view
+export const recordPostView = async (postId: string, userId: string): Promise<void> => {
+    try {
+        if (!userId || !postId) return;
+
+        // 1. Log the view details in a sub-collection or dedicated 'post_views' collection
+        // We use a combined ID to potentially increment viewing multiple times by the same user,
+        // or just keep track of unique watch events.
+        const viewDocId = `${postId}_${userId}`;
+        const viewRef = doc(db, 'post_views', viewDocId);
+
+        const viewSnap = await getDoc(viewRef);
+        if (viewSnap.exists()) {
+            // User saw it again, increment their personal count and last seen
+            await updateDoc(viewRef, {
+                view_count: increment(1),
+                last_viewed_at: serverTimestamp(),
+            });
+        } else {
+            // Fast time viewing
+            const { setDoc } = await import('firebase/firestore');
+            await setDoc(viewRef, {
+                postId,
+                userId,
+                view_count: 1,
+                first_viewed_at: serverTimestamp(),
+                last_viewed_at: serverTimestamp(),
+            });
+        }
+
+        // 2. Increment the global view count on the post
+        const postRef = doc(db, 'posts', postId);
+        await updateDoc(postRef, {
+            views: increment(1)
+        });
+
+    } catch (error) {
+        // Fail silently so it doesn't interrupt the user experience
+        console.error('Error recording post view:', error);
+    }
+};
 // Get posts saved by a user
 export const getSavedPostsForUser = async (userId: string) => {
     try {

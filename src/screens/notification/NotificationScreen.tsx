@@ -68,7 +68,7 @@ export const NotificationScreen = () => {
                 style={[
                     styles.notificationCard,
                     {
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.025)',
                         borderColor: item.is_read ? 'transparent' : `${colors.saffron}20`,
                         borderWidth: 1,
                     },
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
         letterSpacing: 1.2,
     },
     notificationCard: {
-        borderRadius: 28,
+        borderRadius: 24,
         padding: 12,
         marginBottom: 10,
     },
