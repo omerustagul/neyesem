@@ -1,0 +1,444 @@
+﻿import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { collection, doc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import { ChevronDown } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { ActionSheetIOS, Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { auth, db } from '../../api/firebase';
+import { useAuthStore } from '../../store/authStore';
+import { GlassButton } from '../../components/glass/GlassButton';
+import { GlassCard } from '../../components/glass/GlassCard';
+import { GlassInput } from '../../components/glass/GlassInput';
+import { useTheme } from '../../theme/ThemeProvider';
+import { colors } from '../../theme/colors';
+
+export const RegisterScreen = ({ navigation }: any) => {
+    const { theme, typography, isDark } = useTheme();
+    const insets = useSafeAreaInsets();
+    const setUser = useAuthStore((state) => state.setUser);
+
+    const [displayName, setDisplayName] = useState('');
+    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [birthday, setBirthday] = useState(new Date(2000, 0, 1));
+    const [gender, setGender] = useState('');
+    const [phone, setPhone] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [tempDate, setTempDate] = useState<Date>(birthday);
+
+    const genders = ['Erkek', 'Kadın', 'Diğer', 'Belirtmek istemiyorum'];
+
+    const validateUsername = async (usernameValue: string) => {
+        if (!usernameValue || usernameValue.length < 3) return false;
+        const q = query(collection(db, 'profiles'), where('username', '==', usernameValue.toLowerCase()));
+        const snapshot = await getDocs(q);
+        return snapshot.empty;
+    };
+
+    const formatBirthday = (date: Date) => {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return day + '/' + month + '/' + year;
+    };
+
+    const handleDateChange = (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowDatePicker(false);
+            if (selectedDate) setBirthday(selectedDate);
+        } else {
+            if (selectedDate) setTempDate(selectedDate);
+        }
+    };
+
+    const confirmIosDate = () => {
+        setBirthday(tempDate);
+        setShowDatePicker(false);
+    };
+
+    const handleGenderPicker = () => {
+        if (Platform.OS === 'ios') {
+            const options = ['İptal', ...genders];
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    options,
+                    cancelButtonIndex: 0,
+                    userInterfaceStyle: isDark ? 'dark' : 'light',
+                },
+                (buttonIndex) => {
+                    if (buttonIndex > 0) {
+                        setGender(genders[buttonIndex - 1]);
+                    }
+                }
+            );
+        } else {
+            // Android fallback - simple alert
+            if (genders.length > 0) {
+                Alert.alert('Cinsiyet Seç', '', [
+                    ...genders.map((g) => ({
+                        text: g,
+                        onPress: () => setGender(g),
+                    })),
+                    { text: 'İptal', style: 'cancel' },
+                ]);
+            }
+        }
+    };
+
+    const handleRegister = async () => {
+        if (!displayName || !username || !email || !password || !confirmPassword || !gender) {
+            Alert.alert('Hata', 'Lütfen tüm zorunlu alanları doldurun.');
+            return;
+        }
+
+        if (username.length < 3) {
+            Alert.alert('Hata', 'Kullanıcı adı en az 3 karakter olmalı.');
+            return;
+        }
+
+        if (!/^[a-zA-Z0-9_]*$/.test(username)) {
+            Alert.alert('Hata', 'Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir.');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            Alert.alert('Hata', 'Şifreler eşleşmiyor.');
+            return;
+        }
+
+        if (password.length < 6) {
+            Alert.alert('Hata', 'Şifre en az 6 karakter olmalı.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // Check username availability
+            const isAvailable = await validateUsername(username);
+            if (!isAvailable) {
+                Alert.alert('Hata', 'Bu kullanıcı adı zaten kullanılıyor.');
+                setLoading(false);
+                return;
+            }
+
+            // Create user account
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const userId = userCredential.user.uid;
+            console.log('✓ Auth user oluşturuldu:', userId);
+
+            // Create profile document in Firestore
+            try {
+                await setDoc(doc(db, 'profiles', userId), {
+                    uid: userId,
+                    email: email,
+                    display_name: displayName,
+                    username: username.toLowerCase(),
+                    birthday: formatBirthday(birthday),
+                    gender: gender,
+                    phone_number: phone || '',
+                    bio: '',
+                    avatar_url: '',
+                    address: '',
+                    post_count: 0,
+                    followers: [],
+                    following: [],
+                    created_at: new Date().toISOString(),
+                    level: 1,
+                    xp: 0,
+                    intro_seen: false,
+                });
+                console.log('✓ Profile belgesi oluşturuldu:', userId);
+            } catch (profileError: any) {
+                console.error('❌ Profile oluşturma hatası:', profileError);
+                throw profileError;
+            }
+
+            Alert.alert('Başarılı', 'Hesap oluşturuldu! Hoş geldiniz.');
+            setUser(userCredential.user);
+        } catch (error: any) {
+            let errorMessage = 'Kayıt başarısız';
+            if (error.code === 'auth/email-already-in-use') {
+                errorMessage = 'Bu e-posta zaten kayıtlı.';
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage = 'E-posta geçersiz.';
+            } else if (error.code === 'auth/weak-password') {
+                errorMessage = 'Şifre yeterince güçlü değil.';
+            } else if (error.code === 'permission-denied') {
+                errorMessage = 'Firestore izni yok. Firebase Security Rules kontrol et.';
+            }
+            Alert.alert('Hata', errorMessage);
+            console.error('Registration error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={[styles.container, { backgroundColor: theme.background }]}
+        >
+            <ScrollView
+                contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
+                bounces={false}
+            >
+                <View style={styles.header}>
+                    <Image
+                        source={isDark ? require('../../../assets/images/appicon-dark_theme.webp') : require('../../../assets/images/appicon-light_theme.webp')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
+                    <Text style={[styles.subtitle, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                        Lezzet dünyasına hoş geldin!
+                    </Text>
+                </View>
+
+                <GlassCard style={styles.card}>
+                    <Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                        Ad Soyad *
+                    </Text>
+                    <GlassInput
+                        placeholder="Ahmet Yılmaz"
+                        value={displayName}
+                        onChangeText={setDisplayName}
+                        autoCapitalize="words"
+                    />
+
+                    <Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                        Kullanıcı Adı *
+                    </Text>
+                    <GlassInput
+                        placeholder="ahmet_yilmaz"
+                        value={username}
+                        onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                        autoCapitalize="none"
+                    />
+                    <Text style={[styles.hint, { color: colors.oliveLight }]}>
+                        Min 3 karakter, harf/rakam/alt çizgi
+                    </Text>
+
+                    <Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                        E-posta *
+                    </Text>
+                    <GlassInput
+                        placeholder="ornek@email.com"
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                    />
+
+                    <Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                        Doğum Tarihi *
+                    </Text>
+                    <TouchableOpacity
+                        style={[styles.dateButton, { borderColor: colors.glassBorder, backgroundColor: theme.background }]}
+                        onPress={() => setShowDatePicker(true)}
+                    >
+                        <Text style={[styles.dateButtonText, { color: theme.text }]}>
+                            {formatBirthday(birthday)}
+                        </Text>
+                        <ChevronDown color={theme.secondaryText} size={20} />
+                    </TouchableOpacity>
+                    {Platform.OS === 'ios' && showDatePicker && (
+                        <Modal transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
+                            <View style={styles.datePickerModal}>
+                                <View style={[styles.datePickerContainer, { backgroundColor: theme.background }]}> 
+                                    <View style={styles.datePickerHeader}>
+                                        <TouchableOpacity onPress={confirmIosDate}>
+                                            <Text style={[styles.datePickerButton, { color: colors.saffron }]}>Tamam</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <DateTimePicker
+                                        value={tempDate}
+                                        mode="date"
+                                        display="spinner"
+                                        onChange={handleDateChange}
+                                        maximumDate={new Date()}
+                                        minimumDate={new Date(1900, 0, 1)}
+                                    />
+                                </View>
+                            </View>
+                        </Modal>
+                    )}
+
+                    {Platform.OS !== 'ios' && showDatePicker && (
+                        <DateTimePicker
+                            value={birthday}
+                            mode="date"
+                            display="calendar"
+                            onChange={handleDateChange}
+                            maximumDate={new Date()}
+                            minimumDate={new Date(1900, 0, 1)}
+                        />
+                    )}
+<Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                        Cinsiyet *
+                    </Text>
+                    <TouchableOpacity
+                        style={[styles.genderButton, { borderColor: colors.glassBorder, backgroundColor: theme.background }]}
+                        onPress={handleGenderPicker}
+                    >
+                        <Text style={[styles.genderButtonText, { color: gender ? theme.text : theme.secondaryText }]}>
+                            {gender || 'Seç...'}
+                        </Text>
+                        <ChevronDown color={theme.secondaryText} size={20} />
+                    </TouchableOpacity>
+
+                    <Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                        Telefon (Opsiyonel)
+                    </Text>
+                    <GlassInput
+                        placeholder="+90 555 123 4567"
+                        value={phone}
+                        onChangeText={setPhone}
+                        keyboardType="phone-pad"
+                    />
+
+                    <Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                        Şifre *
+                    </Text>
+                    <GlassInput
+                        placeholder="Min 6 karakter"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                    />
+
+                    <Text style={[styles.label, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                        Şifreyi Onayla *
+                    </Text>
+                    <GlassInput
+                        placeholder="Şifreyi tekrar gir"
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        secureTextEntry
+                    />
+
+                    <GlassButton
+                        title={loading ? "Kayıt yapılıyor..." : "Kayıt Ol"}
+                        onPress={handleRegister}
+                        style={styles.button}
+                    />
+
+                    <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.linkButton}>
+                        <Text style={[styles.linkText, { color: colors.saffron, fontFamily: typography.bodyMedium }]}>
+                            Hesabın var mı? Giriş yap
+                        </Text>
+                    </TouchableOpacity>
+                </GlassCard>
+            </ScrollView>
+        </KeyboardAvoidingView>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+    scrollContent: {
+        padding: 24,
+        paddingBottom: 40,
+    },
+    header: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    logo: {
+        height: 50,
+        width: 150,
+        marginBottom: 12,
+    },
+    subtitle: {
+        fontSize: 16,
+        textAlign: 'center',
+    },
+    card: {
+        padding: 20,
+    },
+    label: {
+        fontSize: 13,
+        marginBottom: 8,
+        marginTop: 16,
+        fontWeight: '500',
+    },
+    hint: {
+        fontSize: 11,
+        marginTop: -4,
+        marginBottom: 12,
+    },
+    dateButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        borderWidth: 1,
+        borderRadius: 12,
+        marginBottom: 16,
+    },
+    dateButtonText: {
+        fontSize: 14,
+        flex: 1,
+    },
+    datePickerModal: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    datePickerContainer: {
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingBottom: 20,
+    },
+    datePickerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        marginBottom: 12,
+    },
+    datePickerButton: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    genderButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        borderWidth: 1,
+        borderRadius: 12,
+        marginBottom: 16,
+    },
+    genderButtonText: {
+        fontSize: 14,
+        flex: 1,
+    },
+    button: {
+        marginTop: 24,
+    },
+    linkButton: {
+        marginTop: 16,
+        alignItems: 'center',
+    },
+    linkText: {
+        fontSize: 14,
+        textDecorationLine: 'underline',
+    },
+});
+
+
+
+
+
+
+
+
+
+

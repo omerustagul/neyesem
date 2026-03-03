@@ -1,0 +1,765 @@
+import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
+import { Image as ExpoImage } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { Archive, ChefHat, Flag, Flame, Gauge, Info, Instagram, MoreVertical, Music2, Pencil, Play, Timer, Trash2 } from 'lucide-react-native';
+import { MotiView } from 'moti';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { WebView } from 'react-native-webview';
+import { sendPalateSignal } from '../../api/palateService';
+import { archivePost, deletePost, Post, recordPostView } from '../../api/postService';
+import { useEmbed } from '../../hooks/useEmbed';
+import { useUserProfile } from '../../hooks/useUserProfile';
+import { useAuthStore } from '../../store/authStore';
+import { useLevelStore } from '../../store/levelStore';
+import { useTheme } from '../../theme/ThemeProvider';
+import { colors } from '../../theme/colors';
+import { SelectionPopup } from '../common/SelectionPopup';
+import { UserAvatar } from '../common/UserAvatar';
+import { VerificationBadge } from '../common/VerificationBadge';
+import { getGoldUsernameColor, LevelBadge } from '../level/LevelBadge';
+import { CommentButton, InfoButton, LikeButton, SaveButton } from '../social/SocialButtons';
+import { WhySeeingThisPopup } from '../social/WhySeeingThisPopup';
+
+const { width } = Dimensions.get('window');
+
+interface VideoPostCardProps {
+    post: Post;
+    isLiked: boolean;
+    onLike: () => void;
+    onComment: () => void;
+    onSave: () => void;
+    onShare: () => void;
+    isVisible?: boolean;
+    isMutedOverride?: boolean;
+    isFollowing?: boolean;
+    onToggleFollow?: () => void;
+    hasActiveStory?: boolean;
+    onOpenStory?: () => void;
+}
+
+export const VideoPostCard: React.FC<VideoPostCardProps> = ({
+    post,
+    isLiked,
+    onLike,
+    onComment,
+    onSave,
+    onShare,
+    isVisible = true,
+    isMutedOverride = false,
+    isFollowing = false,
+    hasActiveStory = false,
+    onToggleFollow,
+    onOpenStory
+}) => {
+    const { theme, typography, isDark } = useTheme();
+    const navigation = useNavigation<any>();
+    const isFocused = useIsFocused();
+    const { user } = useAuthStore();
+    const { addXP } = useLevelStore();
+    const postAuthorProfile = useUserProfile(post.userId);
+    const postAuthorLevel = postAuthorProfile?.level ?? 1;
+    const postAuthorVerified = postAuthorProfile?.is_verified ?? false;
+    const handleLikeWithXP = () => { onLike?.(); if (user?.uid) addXP(user.uid, 1); };
+    const handleCommentWithXP = () => { onComment?.(); if (user?.uid) addXP(user.uid, 3); };
+    const handleSaveWithXP = () => { onSave?.(); if (user?.uid) addXP(user.uid, 1); };
+    const { embedHtml, nativeVideoUrl, platform, isLoading, error } = useEmbed(post.content_url || '');
+    const [playbackRate, setPlaybackRate] = useState(1.0);
+    const [isPaused, setIsPaused] = useState(false);
+    const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
+    const [showReadMoreButton, setShowReadMoreButton] = useState(false);
+
+    // Initialize expo-video player
+    const isVideo = post.content_type === 'video' || (!post.content_type && post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$|firebase-storage/i)) || !!nativeVideoUrl;
+    const player = useVideoPlayer(isVideo ? (nativeVideoUrl || post.content_url || '') : '', (player: any) => {
+        player.loop = true;
+        player.muted = true; // Start muted to prevent background audio bleeding on list init
+        player.pause();
+    });
+
+    useEffect(() => {
+        if (!player) return;
+
+        if (isVisible && isFocused && !isPaused && !isMutedOverride) {
+            player.play();
+        } else {
+            player.pause();
+        }
+
+        player.muted = !isVisible || !isFocused || isPaused || isMutedOverride;
+        player.playbackRate = playbackRate;
+    }, [isVisible, isFocused, isPaused, isMutedOverride, playbackRate, player]);
+
+    const isOwner = user?.uid === post.userId;
+    const viewStartTime = useRef<number | null>(null);
+    const viewTimerRef = useRef<any>(null);
+    const hasViewedRef = useRef<boolean>(false);
+
+    useEffect(() => {
+        if (isVisible && isFocused && !isPaused) {
+            // Start the view timer when the video becomes active
+            if (!hasViewedRef.current && user) {
+                viewStartTime.current = Date.now();
+
+                viewTimerRef.current = setTimeout(() => {
+                    // Video played for 3 continuous seconds, count it as a view
+                    recordPostView(post.id, user.uid);
+                    hasViewedRef.current = true; // Prevents multiple increments per scroll session
+
+                    // Also trigger Palate Signal for 3+ seconds
+                    sendPalateSignal(user.uid, 'view_3_to_10s', post.id, post.tags || []);
+                }, 3000);
+            }
+        } else {
+            // Video paused or hidden before 3 seconds
+            if (viewTimerRef.current) {
+                clearTimeout(viewTimerRef.current);
+                viewTimerRef.current = null;
+            }
+
+            // Still track micro-views for ML/Discovery (Palate Signal) if it was less than 3s
+            if (viewStartTime.current && user && !hasViewedRef.current) {
+                const duration = Date.now() - viewStartTime.current;
+                if (duration > 500 && duration < 3000) {
+                    sendPalateSignal(user.uid, 'view_under_3s', post.id, post.tags || []);
+                }
+            }
+            viewStartTime.current = null;
+            hasViewedRef.current = false; // Reset for next time they scroll away and back
+        }
+
+        return () => {
+            if (viewTimerRef.current) {
+                clearTimeout(viewTimerRef.current);
+            }
+        };
+    }, [isVisible, isFocused, isPaused, user, post.id, post.tags]);
+
+    const handlePressMedia = () => {
+        if (post.content_type === 'video' || post.content_type === 'embed') {
+            navigation.navigate('Reels', { initialPostId: post.id });
+        }
+    };
+
+    const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+    const [showWhyPopup, setShowWhyPopup] = useState(false);
+
+    const handleMorePress = () => {
+        setShowOptionsMenu(true);
+    };
+
+    const renderMedia = () => {
+        if (!post.content_url) {
+            return (
+                <View style={[styles.mediaPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                    <ChefHat size={48} color={theme.secondaryText} />
+                </View>
+            );
+        }
+
+        if (post.content_type === 'embed' && !nativeVideoUrl) {
+            if (isLoading) {
+                return (
+                    <View style={[styles.mediaPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
+                        <Text style={{ color: theme.secondaryText }}>Yükleniyor...</Text>
+                    </View>
+                );
+            }
+            if (error) {
+                return (
+                    <View style={[styles.mediaPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
+                        <Text style={{ color: colors.spiceRed }}>İçerik yüklenemedi.</Text>
+                    </View>
+                );
+            }
+            return (
+                <View style={[styles.mediaContainer, styles.webviewWrapper]}>
+                    <WebView
+                        originWhitelist={['*']}
+                        source={{
+                            html: `
+                <html>
+                  <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                      body { 
+                        margin: 0; 
+                        padding: 0; 
+                        display: flex; 
+                        justify-content: center; 
+                        align-items: center;
+                        background: #000; 
+                        min-height: 100vh;
+                        overflow: hidden;
+                      }
+                      /* Hide non-media elements in embeds as much as possible */
+                      .instagram-media, .tiktok-embed { 
+                        margin: 0 !important; 
+                        padding: 0 !important; 
+                        border: none !important;
+                        min-width: 100% !important;
+                        max-width: 100% !important;
+                      }
+                      /* Targeted CSS for Instagram/TikTok elements to focus on media */
+                      .EmbedHeader, .EmbedFooter, .UserTag, .SocialContext { display: none !important; }
+                    </style>
+                  </head>
+                  <body>
+                    ${embedHtml}
+                    <script async src="https://www.instagram.com/embed.js"></script>
+                    <script async src="https://www.tiktok.com/embed.js"></script>
+                  </body>
+                </html>
+              ` }}
+                        style={styles.webview}
+                        scrollEnabled={false}
+                    />
+                    <TouchableOpacity style={styles.mediaOverlay} onPress={handlePressMedia} />
+                </View>
+            );
+        }
+
+        if (post.content_type === 'image' || (!post.content_type && post.content_url?.match(/\.(jpg|jpeg|png|webp|gif)$|image/i))) {
+            return (
+                <View style={styles.mediaContainer}>
+                    <ExpoImage
+                        source={{ uri: post.content_url }}
+                        style={styles.image}
+                        contentFit="cover"
+                        transition={300}
+                        placeholder={post.thumbnail_url}
+                    />
+                    <TouchableOpacity style={styles.mediaOverlay} onPress={handlePressMedia} />
+                </View>
+            );
+        }
+
+        // Default to video if content_url or nativeVideoUrl exists
+        return (
+            <TouchableOpacity
+                style={styles.mediaContainer}
+                onPress={handlePressMedia}
+                onLongPress={() => setPlaybackRate(2.0)}
+                onPressOut={() => setPlaybackRate(1.0)}
+                activeOpacity={0.9}
+            >
+                <VideoView
+                    player={player}
+                    style={styles.video}
+                    contentFit="cover"
+                    nativeControls={false}
+                />
+                {!!(playbackRate === 2.0) && (
+                    <View style={styles.speedIndicator}>
+                        <Text style={styles.speedText}>2x</Text>
+                    </View>
+                )}
+                {!!(isPaused || (!isVisible && post.content_url)) && (
+                    <View style={styles.playIconContainer}>
+                        <Play size={32} color="rgba(255,255,255,0.8)" fill="rgba(255,255,255,0.4)" />
+                    </View>
+                )}
+            </TouchableOpacity>
+        );
+    };
+
+    const InfoCard = ({ icon: Icon, label, value, color }: any) => (
+        <View style={[styles.infoCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', borderColor: theme.border }]}>
+            <Icon size={14} color={color || theme.secondaryText} />
+            <View>
+                <Text style={[styles.infoLabel, { color: theme.secondaryText, fontFamily: typography.body }]}>{label}</Text>
+                <Text style={[styles.infoValue, { color: theme.text, fontFamily: typography.bodyMedium }]}>{value}</Text>
+            </View>
+        </View>
+    );
+
+    const PlatformBadge = ({ platform }: { platform: string }) => {
+        if (platform === 'unknown') return null;
+        const isInstagram = platform === 'instagram';
+        return (
+            <View style={[styles.platformBadge, { backgroundColor: isInstagram ? 'rgba(225, 48, 108, 0.4)' : 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: isInstagram ? 'rgba(225, 48, 108, 0.3)' : 'rgba(255,255,255,0.2)' }]}>
+                {isInstagram ? <Instagram size={12} color="#FFFFFF" /> : <Music2 size={12} color="#FFFFFF" />}
+                <Text style={[styles.platformText, { color: '#FFFFFF' }]}>
+                    {isInstagram ? 'Instagram' : 'TikTok'}
+                </Text>
+            </View>
+        );
+    };
+
+    return (
+        <MotiView
+            from={{ opacity: 0, translateY: 20 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ type: 'timing', duration: 500 }}
+            style={[styles.container, { backgroundColor: theme.background }]}
+        >
+            {/* Media Content with Header Overlay */}
+            <View style={styles.mediaWrapper}>
+                {renderMedia()}
+
+                <View style={styles.headerOverlayContainer} pointerEvents="box-none">
+                    <LinearGradient
+                        colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.0)', 'rgba(0,0,0,0)']}
+                        locations={[0, 0.5, 1]}
+                        style={styles.headerGradient}
+                        pointerEvents="none"
+                    />
+                    <View style={styles.headerOverlayContent} pointerEvents="box-none">
+                        <TouchableOpacity
+                            style={[styles.userInfo, { flex: 1 }]}
+                            onPress={() => {
+                                if (hasActiveStory && onOpenStory) {
+                                    onOpenStory();
+                                } else {
+                                    navigation.navigate('PublicProfile', { userId: post.userId });
+                                }
+                            }}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[
+                                styles.avatarRing,
+                                hasActiveStory && { borderColor: colors.saffron, borderWidth: 2 }
+                            ]}>
+                                <UserAvatar
+                                    userId={post.userId}
+                                    size={34}
+                                    style={styles.avatar}
+                                />
+                            </View>
+                            <View>
+                                {/* Username with level badge + verification */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <Text style={[
+                                        styles.username,
+                                        {
+                                            color: getGoldUsernameColor(postAuthorLevel) || '#FFFFFF',
+                                            fontFamily: typography.bodyMedium,
+                                            textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                                            textShadowOffset: { width: 0, height: 1 },
+                                            textShadowRadius: 2
+                                        }
+                                    ]}>
+                                        {post.display_name || post.username}
+                                    </Text>
+                                    {(postAuthorVerified || postAuthorLevel >= 10) && <VerificationBadge size={13} />}
+                                    {postAuthorLevel >= 5 && <LevelBadge level={postAuthorLevel} size={16} />}
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+
+                        {post.content_type === 'embed' && <PlatformBadge platform={platform} />}
+
+                        <TouchableOpacity onPress={handleMorePress} style={styles.moreButton}>
+                            <MoreVertical size={20} color="#FFFFFF" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+
+            {/* Interaction Buttons */}
+            <View style={styles.actions}>
+                <View style={styles.leftActions}>
+                    <InfoButton onPress={() => navigation.navigate('FoodDetail', { post })} />
+                </View>
+                <View style={styles.rightActions}>
+                    <LikeButton count={post.likes_count} isLiked={isLiked} onLike={handleLikeWithXP} />
+                    <CommentButton count={post.comments_count} onPress={handleCommentWithXP} />
+                    <SaveButton count={post.saves_count || 0} isSaved={post.saved_by?.includes(user?.uid || '')} onSave={handleSaveWithXP} />
+                </View>
+            </View>
+
+            {/* Post Caption */}
+            {!!post.caption && (
+                <View style={styles.captionContainer}>
+                    <BlurView intensity={15} tint={isDark ? 'dark' : 'light'} style={[styles.captionGlass, { borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() => {
+                                if (showReadMoreButton) {
+                                    setIsCaptionExpanded(!isCaptionExpanded);
+                                }
+                            }}
+                        >
+                            <Text
+                                style={[styles.caption, { color: theme.text, fontFamily: typography.body }]}
+                                numberOfLines={isCaptionExpanded ? undefined : 2}
+                                onTextLayout={(e) => {
+                                    // React Native has a bug where lines are all measured even when hidden, but 
+                                    // if it's over 2, we should show the button
+                                    if (e.nativeEvent.lines.length > 2 && !showReadMoreButton && !isCaptionExpanded) {
+                                        setShowReadMoreButton(true);
+                                    }
+                                }}
+                            >
+                                <Text style={{ fontFamily: typography.bodyMedium }}>{post.username}{' '}</Text>
+                                {post.caption}
+                            </Text>
+                            {showReadMoreButton && !isCaptionExpanded && (
+                                <Text style={{ color: colors.saffron, marginTop: 4, fontSize: 13, fontFamily: typography.bodyMedium }}>
+                                    ... devamını gör
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    </BlurView>
+                </View>
+            )}
+
+            {/* Inline Comment Input (Instagram Style) */}
+            <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleCommentWithXP}
+                style={styles.inlineCommentContainer}
+            >
+                {user?.photoURL ? (
+                    <ExpoImage source={{ uri: user.photoURL }} style={styles.inlineCommentAvatar} />
+                ) : (
+                    <View style={[styles.inlineCommentAvatarFallback, { backgroundColor: `${colors.saffron}20` }]}>
+                        <Text style={{ color: colors.saffron, fontSize: 10, fontWeight: '700' }}>
+                            {user?.displayName?.[0]?.toUpperCase() || '?'}
+                        </Text>
+                    </View>
+                )}
+                <Text style={[styles.inlineCommentText, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                    Yorum ekle...
+                </Text>
+            </TouchableOpacity>
+
+            {/* Food Info Cards */}
+            {!!(post.cooking_time || post.difficulty || post.calories || post.protein) && (
+                <View style={styles.infoGrid}>
+                    {!!post.cooking_time && (
+                        <InfoCard icon={Timer} label="Süre" value={post.cooking_time} color={colors.saffron} />
+                    )}
+                    {!!post.difficulty && (
+                        <InfoCard icon={Gauge} label="Zorluk" value={post.difficulty} color={colors.mintFresh} />
+                    )}
+                    {!!post.calories && (
+                        <InfoCard icon={Flame} label="Kalori" value={`${post.calories} kcal`} color={colors.spiceRed} />
+                    )}
+                    {!!post.protein && (
+                        <InfoCard icon={ChefHat} label="Protein" value={post.protein} color={colors.oliveLight} />
+                    )}
+                </View>
+            )}
+
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+            <SelectionPopup
+                visible={showOptionsMenu}
+                title="Gönderi Seçenekleri"
+                onClose={() => {
+                    setShowOptionsMenu(false);
+                    setTimeout(() => setShowWhyPopup(false), 300);
+                }}
+                options={isOwner ? [
+                    {
+                        label: 'Düzenle',
+                        icon: <Pencil size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            navigation.navigate('EditPost', { post });
+                        },
+                    },
+                    {
+                        label: 'Arşivle',
+                        icon: <Archive size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            archivePost(post.id);
+                            Alert.alert('Arşivlendi', 'Gönderi arşive taşındı.');
+                        },
+                    },
+                    {
+                        label: 'Sil',
+                        icon: <Trash2 size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        type: 'destructive',
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            Alert.alert('Sil', 'Bu gönderiyi silmek istediğine emin misin?', [
+                                { text: 'Vazgeç', style: 'cancel' },
+                                { text: 'Sil', style: 'destructive', onPress: () => deletePost(post.id, post.userId) },
+                            ]);
+                        },
+                    },
+                    { label: 'İptal', type: 'cancel', onPress: () => { } },
+                ] : [
+                    {
+                        label: 'Profilini Gör',
+                        icon: <UserAvatar userId={post.userId} size={18} />,
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            navigation.navigate('PublicProfile', { userId: post.userId });
+                        },
+                    },
+                    {
+                        label: isFollowing ? 'Takibi Bırak' : 'Takip Et',
+                        icon: <ChefHat size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            if (onToggleFollow) onToggleFollow();
+                        },
+                    },
+                    {
+                        label: 'Bu gönderiyi neden görüyorsun?',
+                        icon: <Info size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                        onPress: () => {
+                            setShowWhyPopup(true);
+                        },
+                    },
+                    {
+                        label: 'Şikayet Et',
+                        icon: <Flag size={18} color={colors.spiceRed} />,
+                        type: 'destructive',
+                        onPress: () => {
+                            setShowOptionsMenu(false);
+                            Alert.alert('Şikayetiniz Alındı', 'Bu gönderiyi inceleyeceğiz. Teşekkür ederiz.');
+                        },
+                    },
+                    { label: 'İptal', type: 'cancel', onPress: () => { } },
+                ]}
+                showCustomContent={showWhyPopup}
+                customContent={
+                    <WhySeeingThisPopup
+                        username={post.username || 'Kullanıcı'}
+                        isFollowing={isFollowing}
+                        onBack={() => setShowWhyPopup(false)}
+                    />
+                }
+            />
+        </MotiView>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        width: width,
+        marginBottom: 8,
+    },
+    mediaWrapper: {
+        position: 'relative',
+        width: width,
+    },
+    headerOverlayContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 12,
+        right: 12,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        overflow: 'hidden',
+        zIndex: 10,
+    },
+    headerGradient: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 120, // Increased height for a smoother transition
+    },
+    headerOverlayContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+    },
+    userInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    avatarRing: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        padding: 2,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatar: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 19,
+    },
+    username: {
+        fontSize: 14,
+    },
+    time: {
+        fontSize: 12,
+        opacity: 0.7,
+    },
+    moreButton: {
+        padding: 4,
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 19,
+    },
+    mediaContainer: {
+        width: width - 24,
+        marginHorizontal: 12,
+        borderRadius: 24,
+        aspectRatio: 0.7, // 4:3 Ratio (Instagram Style)
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    speedIndicator: {
+        position: 'absolute',
+        top: 20,
+        alignSelf: 'center',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    speedText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    video: {
+        width: '100%',
+        height: '100%',
+    },
+    image: {
+        width: '100%',
+        height: '100%',
+    },
+    playIconContainer: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: [{ translateX: -16 }, { translateY: -16 }],
+        pointerEvents: 'none',
+    },
+    mediaPlaceholder: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    webviewWrapper: {
+        flex: 1,
+        position: 'relative',
+        borderRadius: 24,
+        overflow: 'hidden',
+    },
+    mediaOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'transparent',
+    },
+    webview: {
+        flex: 1,
+        backgroundColor: 'transparent',
+    },
+    actions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    leftActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    rightActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    captionContainer: {
+        paddingHorizontal: 14,
+        paddingBottom: 12,
+    },
+    caption: {
+        fontSize: 14,
+        lineHeight: 18,
+    },
+    inlineCommentContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        gap: 8,
+    },
+    inlineCommentAvatar: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+    },
+    inlineCommentAvatarFallback: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    inlineCommentText: {
+        fontSize: 13,
+    },
+    infoGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingBottom: 20,
+    },
+    infoCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 16,
+        borderWidth: 1,
+        minWidth: (width - 40) / 2,
+        gap: 8,
+    },
+    infoLabel: {
+        fontSize: 10,
+        marginBottom: 1,
+    },
+    infoValue: {
+        fontSize: 12,
+    },
+    divider: {
+        height: 1,
+        width: '100%',
+        marginTop: 10,
+        opacity: 0.3,
+    },
+    platformBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
+        gap: 6,
+        marginRight: 8,
+    },
+    platformText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    headerGlass: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+        borderRadius: 20,
+        flex: 1,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        overflow: 'hidden',
+    },
+    captionGlass: {
+        padding: 12,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        overflow: 'hidden',
+    },
+});

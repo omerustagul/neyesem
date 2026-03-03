@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "builds": {
+    "android": {
+      "production": {
+        "workflow": "managed"
+      },
+      "staging": {
+        "workflow": "managed"
+      }
+    },
+    "ios": {
+      "production": {
+        "workflow": "managed"
+      },
+      "staging": {
+        "workflow": "managed"
+      }
+    }
+  }
+}
