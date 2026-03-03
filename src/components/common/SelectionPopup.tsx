@@ -1,16 +1,17 @@
-import { AnimatePresence, MotiView } from 'moti';
-import React from 'react';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import { BlurView } from 'expo-blur';
+import React, { useCallback, useMemo, useRef } from 'react';
 import {
     Dimensions,
-    Modal,
     Platform,
     StyleSheet,
     Text,
     TouchableOpacity,
-    TouchableWithoutFeedback,
     View
 } from 'react-native';
+import { Portal } from 'react-native-paper';
 import { useTheme } from '../../theme/ThemeProvider';
+import { colors } from '../../theme/colors';
 
 const { width } = Dimensions.get('window');
 
@@ -18,10 +19,10 @@ export interface SelectionOption {
     label: string;
     onPress: () => void;
     icon?: React.ReactNode | ((color: string) => React.ReactNode);
-    activeIconColor?: string; // Optional: specific color for the icon when active
+    activeIconColor?: string;
     type?: 'default' | 'destructive' | 'cancel';
     half?: boolean;
-    active?: boolean; // If true, option is visually highlighted and non-pressable
+    active?: boolean;
 }
 
 interface SelectionPopupProps {
@@ -42,40 +43,63 @@ export const SelectionPopup: React.FC<SelectionPopupProps> = ({
     showCustomContent = false
 }) => {
     const { theme, isDark, typography } = useTheme();
+    const bottomSheetRef = useRef<BottomSheet>(null);
 
-    const cancelOption = options.find(o => o.type === 'cancel');
+    const snapPoints = useMemo(() => {
+        const optionCount = options.length;
+        const autoHeight = 80 + (optionCount * 62) + (title ? 60 : 0) + (Platform.OS === 'ios' ? 60 : 40);
+        // User liked the height of Leaderboard (85%), so we make it more immersive
+        return [Math.min(Math.max(autoHeight, 400), 750)];
+    }, [options, title]);
+
+    const renderBackdrop = useCallback(
+        (props: any) => (
+            <BottomSheetBackdrop
+                {...props}
+                appearsOnIndex={0}
+                disappearsOnIndex={-1}
+                onPress={onClose}
+                opacity={0.5}
+            />
+        ),
+        [onClose]
+    );
+
+    const renderBackground = useCallback(() => (
+        <View style={StyleSheet.absoluteFill}>
+            <BlurView
+                intensity={isDark ? 50 : 80}
+                tint={isDark ? 'dark' : 'light'}
+                style={[
+                    StyleSheet.absoluteFill,
+                    {
+                        backgroundColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.7)',
+                        borderRadius: 30,
+                        overflow: 'hidden',
+                        borderWidth: 1.5,
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                    }
+                ]}
+            />
+        </View>
+    ), [isDark]);
+
     const normalOptions = options.filter(o => o.type !== 'cancel' && o.type !== 'destructive');
     const destructiveOptions = options.filter(o => o.type === 'destructive');
-
-    // Colors
-    const containerBg = isDark ? '#131314ff' : '#FFFFFF';
-    const itemBg = isDark ? 'rgba(35, 35, 35, 0.45)' : 'rgba(0,0,0,0.04)';
-    const activeBg = isDark ? '#14854A' : '#14854A';
-    const textColor = isDark ? '#F5F5F5' : '#1A1A1A';
-    const activeTextColor = isDark ? '#FFFFFF' : '#FFFFFF';
-    const secondaryTextColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)';
-    const cancelBg = isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)';
-    const cancelTextColor = '#EF4444';
+    const cancelOption = options.find(o => o.type === 'cancel');
 
     const renderIcon = (option: SelectionOption, color: string) => {
         if (!option.icon) return null;
-
-        // Use activeIconColor if provided and option is active
         const iconColor = (option.active && option.activeIconColor) ? option.activeIconColor : color;
-
-        if (typeof option.icon === 'function') {
-            return option.icon(iconColor);
-        }
-        if (React.isValidElement(option.icon)) {
-            return React.cloneElement(option.icon as React.ReactElement<any>, { color: iconColor });
-        }
+        if (typeof option.icon === 'function') return option.icon(iconColor);
+        if (React.isValidElement(option.icon)) return React.cloneElement(option.icon as React.ReactElement<any>, { color: iconColor });
         return option.icon;
     };
 
     const renderOptionButton = (option: SelectionOption, index: number) => {
-        const isHalf = option.half === true;
         const isActive = option.active === true;
-        const currentColor = isActive ? activeTextColor : textColor;
+        const isDestructive = option.type === 'destructive';
+        const currentColor = isActive ? colors.warmWhite : (isDestructive ? colors.spiceRed : theme.text);
 
         return (
             <TouchableOpacity
@@ -89,8 +113,10 @@ export const SelectionPopup: React.FC<SelectionPopupProps> = ({
                 style={[
                     styles.optionButton,
                     {
-                        backgroundColor: isActive ? activeBg : itemBg,
-                        width: isHalf ? '48.5%' : '100%',
+                        backgroundColor: isActive ? colors.saffron : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)'),
+                        width: option.half ? '48.5%' : '100%',
+                        borderColor: isActive ? colors.saffron : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'),
+                        borderWidth: 1,
                     }
                 ]}
             >
@@ -112,213 +138,102 @@ export const SelectionPopup: React.FC<SelectionPopupProps> = ({
         );
     };
 
+    if (!visible) return null;
+
     return (
-        <Modal
-            visible={visible}
-            transparent={true}
-            animationType="none"
-            onRequestClose={onClose}
-        >
-            <View style={styles.overlay}>
-                <TouchableWithoutFeedback onPress={onClose}>
-                    <View style={StyleSheet.absoluteFill} />
-                </TouchableWithoutFeedback>
-
-                <AnimatePresence>
-                    {visible && (
-                        <MotiView
-                            from={{ translateY: 300, opacity: 0 }}
-                            animate={{ translateY: 0, opacity: 1 }}
-                            exit={{ translateY: 300, opacity: 0 }}
-                            transition={{
-                                type: 'spring',
-                                damping: 25,
-                                stiffness: 180,
-                                mass: 0.8,
-                            }}
-                        >
-                            {/* Main container — anchored to bottom & sides */}
-                            <View style={[
-                                styles.mainCard,
-                                { backgroundColor: containerBg, paddingHorizontal: 0 },
-                                styles.shadow,
-                            ]}>
-                                <View style={{ flexDirection: 'row', width: width * 2 }}>
-                                    <MotiView
-                                        animate={{ translateX: showCustomContent ? -width : 0 }}
-                                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                                        style={{ width: width, paddingHorizontal: 32, gap: 10 }}
-                                    >
-                                        {/* Title */}
-                                        {title && (
-                                            <Text style={[
-                                                styles.title,
-                                                {
-                                                    color: secondaryTextColor,
-                                                    fontFamily: typography.bodyMedium,
-                                                }
-                                            ]}>
-                                                {title.toLocaleUpperCase('tr-TR')}
-                                            </Text>
-                                        )}
-
-                                        {/* Options Grid */}
-                                        <View style={styles.optionsGrid}>
-                                            {normalOptions.map((option, index) =>
-                                                renderOptionButton(option, index)
-                                            )}
-                                        </View>
-
-                                        {/* Destructive options */}
-                                        {destructiveOptions.map((option, index) => (
-                                            <TouchableOpacity
-                                                key={`destructive-${index}`}
-                                                activeOpacity={0.6}
-                                                onPress={() => {
-                                                    option.onPress();
-                                                    onClose();
-                                                }}
-                                                style={[
-                                                    styles.optionButton,
-                                                    {
-                                                        backgroundColor: itemBg,
-                                                        width: '100%',
-                                                    }
-                                                ]}
-                                            >
-                                                {option.icon && (
-                                                    <View style={styles.optionIcon}>
-                                                        {renderIcon(option, textColor)}
-                                                    </View>
-                                                )}
-                                                <Text style={[
-                                                    styles.optionLabel,
-                                                    {
-                                                        color: textColor,
-                                                        fontFamily: typography.body,
-                                                    }
-                                                ]}>
-                                                    {option.label}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-
-                                        {/* Cancel button */}
-                                        {cancelOption && (
-                                            <TouchableOpacity
-                                                activeOpacity={0.6}
-                                                onPress={onClose}
-                                                style={[
-                                                    styles.cancelButton,
-                                                    { backgroundColor: cancelBg }
-                                                ]}
-                                            >
-                                                {cancelOption.icon ? (
-                                                    <View style={styles.optionIcon}>
-                                                        {renderIcon(cancelOption, cancelTextColor)}
-                                                    </View>
-                                                ) : (
-                                                    <Text style={[styles.cancelX, { fontFamily: typography.bodyMedium }]}>✕</Text>
-                                                )}
-                                                <Text style={[
-                                                    styles.optionLabel,
-                                                    {
-                                                        color: cancelTextColor,
-                                                        fontFamily: typography.bodyMedium,
-                                                    }
-                                                ]}>
-                                                    {cancelOption.label}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </MotiView>
-
-                                    <MotiView
-                                        animate={{ translateX: showCustomContent ? -width : 0 }}
-                                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                                        style={{ width: width, paddingHorizontal: 32 }}
-                                    >
-                                        {customContent}
-                                    </MotiView>
-                                </View>
-                            </View>
-                        </MotiView>
+        <Portal>
+            <BottomSheet
+                ref={bottomSheetRef}
+                index={0}
+                snapPoints={snapPoints}
+                backdropComponent={renderBackdrop}
+                enablePanDownToClose
+                keyboardBehavior="interactive"
+                keyboardBlurBehavior="restore"
+                android_keyboardInputMode="adjustResize"
+                onClose={onClose}
+                backgroundStyle={{ backgroundColor: 'transparent' }}
+                backgroundComponent={renderBackground}
+                handleIndicatorStyle={{ backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)', width: 40 }}
+            >
+                <BottomSheetView style={styles.content}>
+                    {title && (
+                        <Text style={[styles.title, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                            {title.toLocaleUpperCase('tr-TR')}
+                        </Text>
                     )}
-                </AnimatePresence>
-            </View>
-        </Modal>
+
+                    <View style={styles.optionsGrid}>
+                        {normalOptions.map((option, index) => renderOptionButton(option, index))}
+                    </View>
+
+                    {destructiveOptions.map((option, index) => renderOptionButton(option, index + 100))}
+
+                    {cancelOption && (
+                        <TouchableOpacity
+                            onPress={onClose}
+                            style={[styles.cancelButton, { backgroundColor: isDark ? 'rgba(214,70,70,0.1)' : 'rgba(214,70,70,0.05)' }]}
+                        >
+                            <Text style={[styles.cancelLabel, { color: colors.spiceRed, fontFamily: typography.bodyMedium }]}>
+                                {cancelOption.label}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+
+                    {showCustomContent && customContent}
+                </BottomSheetView>
+            </BottomSheet>
+        </Portal>
     );
 };
 
 const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.45)',
-        justifyContent: 'flex-end',
-    },
-    mainCard: {
-        borderTopLeftRadius: 32,
-        borderTopRightRadius: 32,
-        borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 0,
-        paddingTop: 24,
-        paddingBottom: Platform.OS === 'ios' ? 34 : 16,
-        overflow: 'hidden',
-    },
-    shadow: {
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: -12 },
-                shadowOpacity: 0.3,
-                shadowRadius: 24,
-            },
-            android: {
-                elevation: 12,
-            },
-        }),
+    content: {
+        paddingHorizontal: 20,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+        paddingTop: 8,
     },
     title: {
-        fontSize: 12,
+        fontSize: 13,
         textAlign: 'center',
-        marginBottom: 8,
-        letterSpacing: 0.5,
+        marginBottom: 24,
+        letterSpacing: 2,
+        opacity: 0.8,
     },
     optionsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        gap: 8,
+        gap: 10,
+        marginBottom: 10,
     },
     optionButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'flex-start',
-        height: 52,
-        borderRadius: 18,
-        paddingHorizontal: 24,
-        gap: 8,
+        height: 56,
+        borderRadius: 20,
+        paddingHorizontal: 20,
+        gap: 12,
+        marginBottom: 4,
     },
     optionIcon: {
-        width: 22,
-        height: 22,
+        width: 24,
+        height: 24,
         alignItems: 'center',
         justifyContent: 'center',
     },
     optionLabel: {
-        fontSize: 15,
+        fontSize: 16,
     },
     cancelButton: {
-        flexDirection: 'row',
+        height: 56,
+        borderRadius: 20,
         alignItems: 'center',
-        justifyContent: 'flex-start',
-        height: 52,
-        borderRadius: 18,
-        paddingHorizontal: 24,
-        gap: 8,
+        justifyContent: 'center',
+        marginTop: 12,
     },
-    cancelX: {
+    cancelLabel: {
         fontSize: 16,
-        color: '#EF4444',
     },
 });

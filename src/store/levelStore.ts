@@ -1,11 +1,12 @@
 import { doc, updateDoc } from 'firebase/firestore';
+import { create } from 'zustand';
+import { checkBadgesOnLevelUp } from '../api/badgeService';
+import { db } from '../api/firebase';
 import { createNotification } from '../api/notificationService';
 // Level cap configuration
 const MAX_LEVEL = 10;
 const MAX_XP = 5000;
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-import { create } from 'zustand';
-import { db } from '../api/firebase';
 
 interface LevelState {
     level: number;
@@ -82,6 +83,9 @@ export const useLevelStore = create<LevelState>((set, get) => ({
 
         if (leveledUp && onLevelUp) {
             onLevelUp(newLevel, newLevelName);
+
+            // Badge check — fire and forget
+            checkBadgesOnLevelUp(userId, newLevel).catch(() => { });
         }
 
         // XP gain notification (optional)

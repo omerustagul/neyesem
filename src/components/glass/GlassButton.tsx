@@ -14,6 +14,7 @@ interface GlassButtonProps {
     icon?: React.ReactNode;
     trailingIcon?: React.ReactNode;
     loading?: boolean;
+    disabled?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -27,6 +28,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     icon,
     trailingIcon,
     loading = false,
+    disabled = false,
 }) => {
     const { theme, typography } = useTheme();
     const scale = useSharedValue(1);
@@ -45,9 +47,12 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
 
     return (
         <AnimatedPressable
+            disabled={disabled || loading}
             onPress={onPress}
             onPressIn={() => {
-                scale.value = withSpring(0.97);
+                if (!disabled && !loading) {
+                    scale.value = withSpring(0.97);
+                }
             }}
             onPressOut={() => {
                 scale.value = withSpring(1);
@@ -56,6 +61,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
                 animatedStyle,
                 styles.container,
                 style,
+                (disabled || loading) && { opacity: 0.5 },
             ]}
         >
             <GlassSurface

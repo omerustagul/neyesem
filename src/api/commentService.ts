@@ -13,6 +13,7 @@ import {
     updateDoc,
     where
 } from 'firebase/firestore';
+import { checkBadgesOnComment } from './badgeService';
 import { db } from './firebase';
 import { createNotification } from './notificationService';
 
@@ -107,9 +108,12 @@ export const addComment = async (
                 'comment',
                 `gönderine yorum yaptı: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`,
                 undefined,
-                { postId, commentId: docRef.id }
+                { postId, commentId: docRef.id, post_thumbnail_url: postData.thumbnail_url || '' }
             );
         }
+
+        // Badge check — fire and forget
+        checkBadgesOnComment(userId, postId).catch(() => { });
 
         return docRef.id;
     } catch (error) {

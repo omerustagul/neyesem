@@ -1,11 +1,12 @@
-﻿import * as ImagePicker from 'expo-image-picker';
+﻿import { BlurView } from 'expo-blur';
+import * as ImagePicker from 'expo-image-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { doc, getDoc } from 'firebase/firestore';
 import { sha1 } from 'js-sha1';
-import { ArrowRight, BookOpen, Camera, Link, Lock, Image as LucideImage, Sparkles, X } from 'lucide-react-native';
+import { ArrowRight, BookOpen, Camera, Link, Lock, Minus, Plus, Sparkles, Video, X } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { createPost, type FoodCategory } from '../../api/postService';
@@ -17,7 +18,14 @@ import { useLevelStore } from '../../store/levelStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
-type CreateStep = 'select' | 'post_media' | 'post_caption' | 'post_details' | 'post_ai' | 'embed_form';
+const { width, height } = Dimensions.get('window');
+
+type CreateStep = 'select' | 'post_media' | 'post_caption' | 'post_recipe' | 'post_details' | 'post_ai' | 'embed_form';
+
+interface RecipeIngredient {
+    name: string;
+    quantity: string;
+}
 
 export const CreateScreen = ({ navigation }: any) => {
     const { theme, isDark, typography } = useTheme();
@@ -41,6 +49,10 @@ export const CreateScreen = ({ navigation }: any) => {
     const [hashtagInput, setHashtagInput] = useState('');
     const [customHashtags, setCustomHashtags] = useState<string[]>([]);
 
+    // Recipe step state
+    const [recipeDescription, setRecipeDescription] = useState('');
+    const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredient[]>([{ name: '', quantity: '' }]);
+
     useEffect(() => {
         if (!user) return;
         const fetchProfile = async () => {
@@ -58,7 +70,7 @@ export const CreateScreen = ({ navigation }: any) => {
         {
             id: 'post',
             title: 'Gönderi Oluştur',
-            desc: 'Fotoğraf veya video paylaş',
+            desc: 'Tarif videon ile parlat',
             icon: BookOpen,
             minLevel: 1,
             gradient: ['#22c55e', '#16a34a'],
@@ -276,6 +288,8 @@ export const CreateScreen = ({ navigation }: any) => {
         setFoodCategory(null);
         setHashtagInput('');
         setCustomHashtags([]);
+        setRecipeDescription('');
+        setRecipeIngredients([{ name: '', quantity: '' }]);
         setStep('select');
     };
 
@@ -336,7 +350,7 @@ export const CreateScreen = ({ navigation }: any) => {
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images', 'videos'],
+            mediaTypes: ['videos'],
             allowsEditing: true,
             aspect: [9, 16],
             quality: 0.7,
@@ -357,7 +371,7 @@ export const CreateScreen = ({ navigation }: any) => {
         }
 
         const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ['images', 'videos'],
+            mediaTypes: ['videos'],
             allowsEditing: true,
             aspect: [9, 16],
             quality: 0.7,
@@ -371,10 +385,11 @@ export const CreateScreen = ({ navigation }: any) => {
     };
 
     const renderProgressBar = () => {
-        const steps: CreateStep[] = ['post_media', 'post_caption', 'post_details', 'post_ai'];
+        const steps: CreateStep[] = ['post_media', 'post_caption', 'post_recipe', 'post_details', 'post_ai'];
         if (step === 'select' || step === 'embed_form') return null;
 
         const currentIndex = steps.indexOf(step);
+        if (currentIndex === -1) return null;
         const progress = ((currentIndex + 1) / steps.length) * 100;
 
         return (
@@ -399,18 +414,30 @@ export const CreateScreen = ({ navigation }: any) => {
             case 'post_media':
                 return (
                     <MotiView from={{ opacity: 0, translateX: 50 }} animate={{ opacity: 1, translateX: 0 }} transition={{ type: 'timing' }}>
-                        <Text style={[styles.stepTitle, { color: theme.text, fontFamily: typography.display }]}>Video Seç</Text>
+                        <Text style={[styles.stepTitle, { color: theme.text, fontFamily: typography.display }]}>Video Seç 🎬</Text>
                         <Text style={[styles.stepDesc, { color: theme.secondaryText, fontFamily: typography.body }]}>Tarifini en iyi anlatan videoyu seçerek başlayalım.</Text>
 
                         <View style={styles.mediaOptions}>
-                            <TouchableOpacity style={[styles.bigMediaBtn, { borderColor: theme.border }]} onPress={takeVideo}>
-                                <Camera size={40} color={colors.saffron} />
-                                <Text style={[styles.bigMediaLabel, { color: theme.text, fontFamily: typography.bodyMedium }]}>Kamera ile Çek</Text>
+                            <TouchableOpacity style={[styles.bigMediaBtn, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]} onPress={takeVideo}>
+                                <View style={[styles.bigMediaIconBox, { backgroundColor: `${colors.saffron}15` }]}>
+                                    <Camera size={28} color={colors.saffron} />
+                                </View>
+                                <View>
+                                    <Text style={[styles.bigMediaLabel, { color: theme.text, fontFamily: typography.display }]}>Kamera ile Çek</Text>
+                                    <Text style={[{ color: theme.secondaryText, fontSize: 12, fontFamily: typography.body }]}>Anında video çek ve paylaş</Text>
+                                </View>
+                                <ArrowRight size={18} color={theme.border} />
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={[styles.bigMediaBtn, { borderColor: theme.border }]} onPress={pickImage}>
-                                <LucideImage size={40} color={colors.saffron} />
-                                <Text style={[styles.bigMediaLabel, { color: theme.text, fontFamily: typography.bodyMedium }]}>Galeriden Seç</Text>
+                            <TouchableOpacity style={[styles.bigMediaBtn, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]} onPress={pickImage}>
+                                <View style={[styles.bigMediaIconBox, { backgroundColor: `${colors.saffron}15` }]}>
+                                    <Video size={28} color={colors.saffron} />
+                                </View>
+                                <View>
+                                    <Text style={[styles.bigMediaLabel, { color: theme.text, fontFamily: typography.display }]}>Galeriden Seç</Text>
+                                    <Text style={[{ color: theme.secondaryText, fontSize: 12, fontFamily: typography.body }]}>Önceden hazırladığın videoyu yükle</Text>
+                                </View>
+                                <ArrowRight size={18} color={theme.border} />
                             </TouchableOpacity>
                         </View>
                     </MotiView>
@@ -434,7 +461,79 @@ export const CreateScreen = ({ navigation }: any) => {
                                 autoFocus
                             />
                             <GlassButton
-                                title="Devam Et"
+                                title="İleri"
+                                trailingIcon={<ArrowRight size={20} color={colors.warmWhite} />}
+                                onPress={() => setStep('post_recipe')}
+                            />
+                        </GlassCard>
+                    </MotiView>
+                );
+
+            case 'post_recipe':
+                return (
+                    <MotiView from={{ opacity: 0, translateX: 50 }} animate={{ opacity: 1, translateX: 0 }} transition={{ type: 'timing' }}>
+                        <Text style={[styles.stepTitle, { color: theme.text, fontFamily: typography.display }]}>Tarif Bilgileri 📝</Text>
+                        <Text style={[styles.stepDesc, { color: theme.secondaryText, fontFamily: typography.body }]}>Tarifini ve malzemeleri ekle, takipçilerine yol göster.</Text>
+
+                        <GlassCard>
+                            <Text style={styles.miniLabel}>TARİF AÇIKLAMASI</Text>
+                            <TextInput
+                                style={[styles.captionInput, { color: theme.text, borderColor: theme.border, fontFamily: typography.body, minHeight: 100 }]}
+                                placeholder="Adım adım hazırlanışı anlat..."
+                                placeholderTextColor={theme.secondaryText}
+                                value={recipeDescription}
+                                onChangeText={setRecipeDescription}
+                                multiline
+                                numberOfLines={4}
+                            />
+
+                            <Text style={[styles.miniLabel, { marginTop: 16 }]}>MALZEMELER</Text>
+                            {recipeIngredients.map((ing, idx) => (
+                                <View key={idx} style={styles.ingredientRow}>
+                                    <TextInput
+                                        style={[styles.ingredientNameInput, { color: theme.text, borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', fontFamily: typography.body }]}
+                                        placeholder="Malzeme adı"
+                                        placeholderTextColor={theme.secondaryText}
+                                        value={ing.name}
+                                        onChangeText={(text) => {
+                                            const updated = [...recipeIngredients];
+                                            updated[idx] = { ...updated[idx], name: text };
+                                            setRecipeIngredients(updated);
+                                        }}
+                                    />
+                                    <TextInput
+                                        style={[styles.ingredientQtyInput, { color: theme.text, borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', fontFamily: typography.body }]}
+                                        placeholder="Miktar"
+                                        placeholderTextColor={theme.secondaryText}
+                                        value={ing.quantity}
+                                        onChangeText={(text) => {
+                                            const updated = [...recipeIngredients];
+                                            updated[idx] = { ...updated[idx], quantity: text };
+                                            setRecipeIngredients(updated);
+                                        }}
+                                    />
+                                    {recipeIngredients.length > 1 && (
+                                        <TouchableOpacity
+                                            onPress={() => setRecipeIngredients(recipeIngredients.filter((_, i) => i !== idx))}
+                                            style={styles.removeIngBtn}
+                                        >
+                                            <Minus size={16} color={colors.spiceRed} />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            ))}
+
+                            <TouchableOpacity
+                                onPress={() => setRecipeIngredients([...recipeIngredients, { name: '', quantity: '' }])}
+                                style={[styles.addIngBtn, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}
+                            >
+                                <Plus size={16} color={colors.saffron} />
+                                <Text style={[{ color: colors.saffron, fontSize: 14, fontFamily: typography.bodyMedium }]}>Malzeme Ekle</Text>
+                            </TouchableOpacity>
+
+                            <GlassButton
+                                title="İleri"
+                                style={{ marginTop: 24 }}
                                 trailingIcon={<ArrowRight size={20} color={colors.warmWhite} />}
                                 onPress={() => setStep('post_details')}
                             />
@@ -560,7 +659,7 @@ export const CreateScreen = ({ navigation }: any) => {
                                         <View style={styles.aiIconBox}><Text style={{ fontSize: 20 }}>⚖️</Text></View>
                                         <View>
                                             <Text style={styles.aiResultLabel}>PROTEİN</Text>
-                                            <Text style={[styles.aiResultValue, { color: theme.text }]}>{protein}</Text>
+                                            <Text style={[styles.aiResultValue, { color: theme.warmWhite }]}>{protein}</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -610,11 +709,28 @@ export const CreateScreen = ({ navigation }: any) => {
         }
     };
 
+    const renderBackground = () => (
+        <View style={StyleSheet.absoluteFill}>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.background }]} />
+            <MotiView
+                from={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: 'timing', duration: 1000 }}
+                style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
+            >
+                <View style={[styles.bgCircle, { top: -100, left: -50, backgroundColor: isDark ? `${colors.saffron}15` : `${colors.saffron}10` }]} />
+                <View style={[styles.bgCircle, { bottom: height * 0.2, right: -100, backgroundColor: isDark ? `${colors.spiceRed}10` : `${colors.spiceRed}05` }]} />
+            </MotiView>
+            <BlurView intensity={isDark ? 60 : 40} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+        </View>
+    );
+
     if (step !== 'select') {
         return (
-            <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <View style={styles.container}>
+                {renderBackground()}
                 {/* Header */}
-                <View style={[styles.formHeader, { paddingTop: insets.top + 40 }]}>
+                <View style={[styles.formHeader, { paddingTop: insets.top + (Platform.OS === 'ios' ? 10 : 20) }]}>
                     <TouchableOpacity
                         style={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}
                         onPress={handleClose}
@@ -632,6 +748,7 @@ export const CreateScreen = ({ navigation }: any) => {
                     bounces={true}
                     alwaysBounceVertical={Platform.OS === 'ios'}
                     showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
                 >
                     {renderProgressBar()}
                     {renderStepContent()}
@@ -642,18 +759,25 @@ export const CreateScreen = ({ navigation }: any) => {
 
     // Main selection view — full screen
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.container}>
+            {renderBackground()}
             {/* Header */}
-            <View style={[styles.selectHeader, { paddingTop: insets.top + 40 }]}>
+            <View style={[styles.selectHeader, { paddingTop: insets.top + (Platform.OS === 'ios' ? 10 : 20) }]}>
                 <TouchableOpacity
                     style={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}
                     onPress={handleClose}
                 >
                     <X size={18} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={[styles.selectTitle, { color: theme.text, fontFamily: typography.display }]}>
-                    Oluştur
-                </Text>
+                <MotiView
+                    from={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: 'spring' }}
+                >
+                    <Text style={[styles.selectTitle, { color: theme.text, fontFamily: typography.display }]}>
+                        Hadi Parlayalım ✨
+                    </Text>
+                </MotiView>
                 <View style={{ width: 36 }} />
             </View>
 
@@ -665,23 +789,34 @@ export const CreateScreen = ({ navigation }: any) => {
                     return (
                         <MotiView
                             key={option.id}
-                            from={{ opacity: 0, translateY: 20 }}
-                            animate={{ opacity: 1, translateY: 0 }}
-                            transition={{ type: 'timing', duration: 400, delay: index * 100 }}
+                            from={{ opacity: 0, translateX: -20 }}
+                            animate={{ opacity: 1, translateX: 0 }}
+                            transition={{ type: 'spring', delay: index * 100 }}
                         >
                             <TouchableOpacity
-                                style={{ opacity: isLocked ? 0.55 : 1, marginBottom: 14 }}
+                                style={{ opacity: isLocked ? 0.6 : 1, marginBottom: 16 }}
                                 onPress={() => handleOptionPress(option)}
-                                activeOpacity={0.75}
+                                activeOpacity={0.8}
                             >
-                                <GlassCard>
+                                <GlassCard
+                                    intensity={isDark ? 30 : 50}
+                                    style={{ borderColor: isLocked ? 'transparent' : `${option.gradient[0]}30` }}
+                                >
                                     <View style={styles.optionRow}>
-                                        <View style={[styles.optionIcon, { backgroundColor: `${option.gradient[0]}18` }]}>
+                                        <View style={[styles.optionIcon, { backgroundColor: `${option.gradient[0]}25` }]}>
                                             <Icon size={28} color={option.gradient[0]} />
+                                            {!isLocked && (
+                                                <MotiView
+                                                    from={{ opacity: 0, scale: 0 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    transition={{ type: 'spring', delay: 400 + index * 100 }}
+                                                    style={[styles.iconAura, { backgroundColor: option.gradient[0] }]}
+                                                />
+                                            )}
                                         </View>
                                         <View style={styles.optionText}>
                                             <View style={styles.optionTitleRow}>
-                                                <Text style={[styles.optionTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                                <Text style={[styles.optionTitle, { color: theme.text, fontFamily: typography.display, fontSize: 18 }]}>
                                                     {option.title}
                                                 </Text>
                                                 {isLocked && (
@@ -693,16 +828,29 @@ export const CreateScreen = ({ navigation }: any) => {
                                                     </View>
                                                 )}
                                             </View>
-                                            <Text style={[styles.optionDesc, { color: theme.secondaryText, fontFamily: typography.body }]}>
-                                                {isLocked ? `Level ${option.minLevel} gerekli` : option.desc}
+                                            <Text style={[styles.optionDesc, { color: theme.secondaryText, fontFamily: typography.body, opacity: 0.8 }]}>
+                                                {isLocked ? `Daha fazla lezzet paylaşarak Level ${option.minLevel} ol!` : option.desc}
                                             </Text>
                                         </View>
+                                        <ArrowRight size={20} color={isLocked ? theme.border : theme.secondaryText} style={{ opacity: 0.5 }} />
                                     </View>
                                 </GlassCard>
                             </TouchableOpacity>
                         </MotiView>
                     );
                 })}
+
+                <MotiView
+                    from={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 600 }}
+                    style={styles.tipCard}
+                >
+                    <Sparkles size={16} color={colors.saffron} />
+                    <Text style={[styles.tipText, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                        İpucu: Videolarında netlik ve iyi ışık daha fazla etkileşim almanı sağlar.
+                    </Text>
+                </MotiView>
             </View>
         </View>
     );
@@ -825,16 +973,22 @@ const styles = StyleSheet.create({
     progressText: { fontSize: 12, textAlign: 'right' },
     mediaOptions: { flex: 1, gap: 16, marginTop: 10 },
     bigMediaBtn: {
-        height: 140,
+        height: 100,
         borderRadius: 24,
-        borderWidth: 2,
-        borderStyle: 'dashed',
+        borderWidth: 1,
+        paddingHorizontal: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+    },
+    bigMediaIconBox: {
+        width: 56,
+        height: 56,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 12,
-        backgroundColor: 'rgba(0,0,0,0.02)'
     },
-    bigMediaLabel: { fontSize: 16 },
+    bigMediaLabel: { fontSize: 18 },
     miniLabel: { fontSize: 11, fontWeight: '900', letterSpacing: 1, color: colors.oliveMuted, marginBottom: 12 },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     chip: {
@@ -905,6 +1059,74 @@ const styles = StyleSheet.create({
     hashtagRemove: {
         fontSize: 20,
         fontWeight: 'bold',
+    },
+    ingredientRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 10,
+    },
+    ingredientNameInput: {
+        flex: 1,
+        height: 44,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        fontSize: 14,
+    },
+    ingredientQtyInput: {
+        width: 90,
+        height: 44,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        fontSize: 14,
+    },
+    removeIngBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    addIngBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        height: 44,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        marginTop: 4,
+    },
+    bgCircle: {
+        position: 'absolute',
+        width: height * 0.4,
+        height: height * 0.4,
+        borderRadius: height * 0.2,
+        opacity: 0.6,
+    },
+    iconAura: {
+        position: 'absolute',
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        opacity: 0.1,
+    },
+    tipCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        padding: 20,
+        marginTop: 20,
+        backgroundColor: 'rgba(0,0,0,0.02)',
+        borderRadius: 20,
+    },
+    tipText: {
+        flex: 1,
+        fontSize: 13,
+        lineHeight: 18,
     },
 });
 

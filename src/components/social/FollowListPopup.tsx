@@ -1,16 +1,18 @@
 import BottomSheet, { BottomSheetBackdrop, BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { useNavigation } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
 import { doc, getDoc } from 'firebase/firestore';
-import { User } from 'lucide-react-native';
-import { UserPlus, XCircle } from 'lucide-react-native';
-import { useAuthStore } from '../../store/authStore';
-import { unfollowUser, followUser } from '../../api/followService';
+import { User, UserPlus, XCircle } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Portal } from 'react-native-paper';
 import { db } from '../../api/firebase';
+import { followUser, unfollowUser } from '../../api/followService';
+import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
+import { VerificationBadge } from '../common/VerificationBadge';
+import { LevelBadge } from '../level/LevelBadge';
 
 interface FollowListPopupProps {
     userIds: string[];
@@ -23,6 +25,8 @@ interface UserItem {
     username: string;
     display_name: string;
     avatar_url?: string;
+    level?: number;
+    is_verified?: boolean;
 }
 
 export const FollowListPopup: React.FC<FollowListPopupProps> = ({ userIds, title, onClose }) => {
@@ -38,7 +42,7 @@ export const FollowListPopup: React.FC<FollowListPopupProps> = ({ userIds, title
     const [currentUserFollowing, setCurrentUserFollowing] = useState<string[]>([]);
     const currentUser = currentAuthUser;
 
-useEffect(() => {
+    useEffect(() => {
         const fetchUsers = async () => {
             setLoading(true);
             const results: UserItem[] = [];
@@ -52,6 +56,8 @@ useEffect(() => {
                             username: data.username || '',
                             display_name: data.display_name || '',
                             avatar_url: data.avatar_url,
+                            level: data.level || 1,
+                            is_verified: data.is_verified || false,
                         });
                     }
                 } catch { }
@@ -59,8 +65,8 @@ useEffect(() => {
             setUsers(results);
             setLoading(false);
         };
-            if (userIds.length > 0) fetchUsers();
-            else setLoading(false);
+        if (userIds.length > 0) fetchUsers();
+        else setLoading(false);
     }, [userIds]);
 
     // Load current user's following for action buttons
@@ -87,10 +93,30 @@ useEffect(() => {
                 appearsOnIndex={0}
                 disappearsOnIndex={-1}
                 onPress={onClose}
+                opacity={0.5}
             />
         ),
         [onClose]
     );
+
+    const renderBackground = useCallback(() => (
+        <View style={StyleSheet.absoluteFill}>
+            <BlurView
+                intensity={isDark ? 50 : 80}
+                tint={isDark ? 'dark' : 'light'}
+                style={[
+                    StyleSheet.absoluteFill,
+                    {
+                        backgroundColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.7)',
+                        borderRadius: 30,
+                        overflow: 'hidden',
+                        borderWidth: 1.5,
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                    }
+                ]}
+            />
+        </View>
+    ), [isDark]);
 
     const handleUserPress = (userId: string) => {
         onClose();
@@ -119,7 +145,7 @@ useEffect(() => {
         return (
             <View style={styles.userRow}>
                 <TouchableOpacity style={styles.userInfoArea} onPress={onPressRow} activeOpacity={0.7}>
-                    <View style={[styles.avatar, { backgroundColor: `${colors.saffron}20` }]}> 
+                    <View style={[styles.avatar, { backgroundColor: `${colors.saffron}20` }]}>
                         {item.avatar_url ? (
                             <Image source={{ uri: item.avatar_url }} style={styles.avatarImage} />
                         ) : (
@@ -127,20 +153,24 @@ useEffect(() => {
                         )}
                     </View>
                     <View style={styles.userInfo}>
-                        <Text style={[styles.displayName, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                            {item.display_name || item.username}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Text style={[styles.displayName, { color: theme.text, fontFamily: typography.bodyMedium }]} numberOfLines={1}>
+                                {item.display_name || item.username}
+                            </Text>
+                            {(item.is_verified || (item.level || 1) >= 10) && <VerificationBadge size={13} />}
+                            {(item.level || 1) >= 5 && <LevelBadge level={item.level || 1} size={15} />}
+                        </View>
                         <Text style={[styles.username, { color: theme.secondaryText, fontFamily: typography.body }]}>@
-                          {item.username}
+                            {item.username}
                         </Text>
                     </View>
                 </TouchableOpacity>
-        <TouchableOpacity style={isFollowing ? styles.rightBtnUnfollow : styles.rightBtn} onPress={onToggleFollow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {isFollowing ? <XCircle size={14} color="#fff" /> : <UserPlus size={14} color="#fff" />}
-                <Text style={isFollowing ? styles.rightBtnUnfollowText : styles.rightBtnText}>{' '}{isFollowing ? 'Takipten Çık' : 'Takip Et'}</Text>
-            </View>
-        </TouchableOpacity>
+                <TouchableOpacity style={isFollowing ? styles.rightBtnUnfollow : styles.rightBtn} onPress={onToggleFollow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {isFollowing ? <XCircle size={14} color="#fff" /> : <UserPlus size={14} color="#fff" />}
+                        <Text style={isFollowing ? styles.rightBtnUnfollowText : styles.rightBtnText}>{' '}{isFollowing ? 'Takipten Çık' : 'Takip Et'}</Text>
+                    </View>
+                </TouchableOpacity>
             </View>
         );
     };
@@ -152,14 +182,12 @@ useEffect(() => {
                 index={0}
                 snapPoints={snapPoints}
                 backdropComponent={renderBackdrop}
-                enablePanDownToClose
+                backgroundComponent={renderBackground}
                 onClose={onClose}
                 backgroundStyle={{
-                    backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-                    borderTopLeftRadius: 24,
-                    borderTopRightRadius: 24,
+                    backgroundColor: 'transparent',
                 }}
-                handleIndicatorStyle={{ backgroundColor: theme.border }}
+                handleIndicatorStyle={{ backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)', width: 40 }}
             >
                 <View style={styles.container}>
                     <View style={styles.header}>
@@ -199,16 +227,15 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 20,
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.05)',
+        paddingVertical: 20,
         alignItems: 'center',
     },
     title: {
-        fontSize: 16,
+        fontSize: 17,
+        fontWeight: '600',
     },
     listContent: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 20,
         paddingTop: 8,
         paddingBottom: 40,
     },
@@ -218,17 +245,17 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
     },
     avatar: {
-        width: 46,
-        height: 46,
-        borderRadius: 23,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 14,
     },
     avatarImage: {
-        width: 46,
-        height: 46,
-        borderRadius: 23,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
     },
     userInfo: {
         flex: 1,
@@ -239,6 +266,7 @@ const styles = StyleSheet.create({
     },
     username: {
         fontSize: 13,
+        opacity: 0.6,
     },
     emptyContainer: {
         alignItems: 'center',
@@ -249,7 +277,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 8,
+        paddingVertical: 10,
     },
     userInfoArea: {
         flexDirection: 'row',
@@ -257,18 +285,18 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     rightBtn: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 16,
         backgroundColor: colors.saffron,
         alignItems: 'center',
         justifyContent: 'center',
         marginLeft: 8,
     },
     rightBtnUnfollow: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 16,
         backgroundColor: colors.spiceRed,
         alignItems: 'center',
         justifyContent: 'center',
@@ -277,11 +305,11 @@ const styles = StyleSheet.create({
     rightBtnText: {
         color: '#fff',
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     rightBtnUnfollowText: {
         color: '#fff',
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '700',
     },
 });

@@ -38,6 +38,8 @@ export const PantryScreen = () => {
     const [showAddManual, setShowAddManual] = useState(false);
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
+    const [showAllIngredients, setShowAllIngredients] = useState(false);
+    const [manualTrigger, setManualTrigger] = useState(false);
 
 
     useEffect(() => {
@@ -46,10 +48,10 @@ export const PantryScreen = () => {
             setPantry(data);
             setIsLoading(false);
 
-            // Fetch AI suggestions when pantry updates
-            if (data && data.ingredients.length > 0) {
+            // Fetch AI suggestions when pantry updates — only on first load or manual trigger
+            if (!manualTrigger && data && data.ingredients.length > 0) {
                 generateChefSuggestions(data.ingredients.map(i => i.name));
-            } else {
+            } else if (!data || data.ingredients.length === 0) {
                 setSuggestions([]);
             }
         });
@@ -256,6 +258,16 @@ export const PantryScreen = () => {
                         </TouchableOpacity>
                     ))}
                 </View>
+
+                <TouchableOpacity
+                    style={[styles.relatedContentBtn, { borderColor: colors.saffron + '40' }]}
+                    onPress={() => navigation.navigate('Explore', { searchQuery: item.title })}
+                    activeOpacity={0.75}
+                >
+                    <Text style={[styles.relatedContentText, { color: colors.saffron, fontFamily: typography.bodyMedium }]}>
+                        İlgili İçeriklere Bak →
+                    </Text>
+                </TouchableOpacity>
             </LinearGradient>
         </MotiView>
     );
@@ -328,9 +340,13 @@ export const PantryScreen = () => {
                                 Mutfaktaki Malzemeler
                             </Text>
                         </View>
+                        {/* Ingredients Grid */}
                     </>
                 }
-                data={pantry?.ingredients || []}
+                data={showAllIngredients
+                    ? (pantry?.ingredients || [])
+                    : (pantry?.ingredients || []).slice(0, 6)
+                }
                 renderItem={renderIngredient}
                 keyExtractor={(item, index) => index.toString()}
                 numColumns={2}
@@ -348,6 +364,46 @@ export const PantryScreen = () => {
                 }
                 ListFooterComponent={
                     <>
+                        {/* Show More / Less toggle */}
+                        {(pantry?.ingredients || []).length > 6 && (
+                            <TouchableOpacity
+                                onPress={() => setShowAllIngredients(!showAllIngredients)}
+                                style={[styles.showMoreBtn, { borderColor: theme.border }]}
+                            >
+                                <Text style={[styles.showMoreText, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>
+                                    {showAllIngredients
+                                        ? 'Daha az göster'
+                                        : `Daha fazla göster (${(pantry?.ingredients || []).length - 6} daha)`}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* AI CTA Button */}
+                        {(pantry?.ingredients || []).length > 0 && (
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setManualTrigger(true);
+                                    if (pantry?.ingredients) {
+                                        generateChefSuggestions(pantry.ingredients.map(i => i.name));
+                                    }
+                                }}
+                                activeOpacity={0.85}
+                                style={styles.aiCtaWrapper}
+                            >
+                                <LinearGradient
+                                    colors={['#f59e0b', '#ef4444']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.aiCtaBtn}
+                                >
+                                    <Sparkles size={20} color="#fff" />
+                                    <Text style={[styles.aiCtaBtnText, { fontFamily: typography.display }]}>
+                                        Malzemelerimle ne yapabilirim?
+                                    </Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        )}
+                        {/* AI Suggestions Section */}
                         {(suggestions.length > 0 || isFetchingSuggestions) && (
                             <View style={styles.suggestionsSection}>
                                 <View style={styles.sectionHeader}>
@@ -535,6 +591,47 @@ const styles = StyleSheet.create({
     suggestionsSection: {
         marginTop: 20,
     },
+    showMoreBtn: {
+        alignItems: 'center',
+        paddingVertical: 12,
+        marginVertical: 8,
+        borderWidth: 1,
+        borderRadius: 16,
+        borderStyle: 'dashed',
+    },
+    showMoreText: {
+        fontSize: 14,
+    },
+    aiCtaWrapper: {
+        marginTop: 20,
+        marginBottom: 8,
+        borderRadius: 20,
+        overflow: 'hidden',
+    },
+    aiCtaBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        paddingVertical: 18,
+        paddingHorizontal: 20,
+    },
+    aiCtaBtnText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    relatedContentBtn: {
+        marginTop: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        alignItems: 'center',
+    },
+    relatedContentText: {
+        fontSize: 14,
+    },
     aiRecipeContainer: {
         paddingHorizontal: 16,
         gap: 12,
@@ -588,3 +685,4 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
 });
+

@@ -16,7 +16,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
     style,
     contentStyle,
     intensity = 32,
-    borderRadius = 28,
+    borderRadius = 24,
     withShadow = true,
 }) => {
     return (

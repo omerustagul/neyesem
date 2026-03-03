@@ -23,6 +23,7 @@ import { AppearanceScreen } from '../screens/settings/AppearanceScreen';
 import { ArchiveScreen } from '../screens/settings/ArchiveScreen';
 import { PasswordSecurityScreen } from '../screens/settings/PasswordSecurityScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
+import { VerificationInfoScreen } from '../screens/settings/VerificationInfoScreen';
 import { useAuthStore } from '../store/authStore';
 import { useNotificationStore } from '../store/notificationStore';
 import { colors } from '../theme/colors';
@@ -216,6 +217,15 @@ export const RootNavigator = () => {
                                     name="PasswordSecurity"
                                     component={PasswordSecurityScreen}
                                     options={{
+                                        contentStyle: { backgroundColor: theme.background }
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="VerificationInfo"
+                                    component={VerificationInfoScreen}
+                                    options={{
+                                        animation: 'slide_from_bottom',
+                                        presentation: 'modal',
                                         contentStyle: { backgroundColor: theme.background }
                                     }}
                                 />

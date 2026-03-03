@@ -17,11 +17,17 @@ export interface AppNotification {
     sender?: {
         username: string;
         avatar_url: string;
+        uid?: string;
+        is_verified?: boolean;
+        level?: number;
     };
     // Optional fields to support richer navigation
     sender_id?: string;
     postId?: string;
     post_id?: string;
+    post_thumbnail_url?: string;
+    thumbnail_url?: string;
+    commentId?: string;
 }
 
 interface NotificationState {

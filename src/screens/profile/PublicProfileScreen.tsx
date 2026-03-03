@@ -1,16 +1,20 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { ArrowLeft, User as UserIcon } from 'lucide-react-native';
+import { ArrowLeft, Bell, Share2, UserCheck, User as UserIcon, UserPlus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, Platform, RefreshControl, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { followUser, unfollowUser } from '../../api/followService';
+import { getNotificationSettings } from '../../api/notificationService';
 import { Post, subscribeToUserPosts } from '../../api/postService';
 import { Story, subscribeToActiveStories } from '../../api/storyService';
+import { VerificationBadge } from '../../components/common/VerificationBadge';
 import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
 import { AnimatedLevelCard } from '../../components/level/AnimatedLevelCard';
+import { LevelBadge, getGoldUsernameColor } from '../../components/level/LevelBadge';
 import { FollowListPopup } from '../../components/social/FollowListPopup';
+import { NotificationSettingsPopup } from '../../components/social/NotificationSettingsPopup';
 import { StoryViewer } from '../../components/social/StoryViewer';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -34,6 +38,8 @@ export const PublicProfileScreen = () => {
     const [followListType, setFollowListType] = useState<'followers' | 'following' | null>(null);
     const [activeStories, setActiveStories] = useState<Story[]>([]);
     const [viewerVisible, setViewerVisible] = useState(false);
+    const [notificationSettings, setNotificationSettings] = useState<any>(null);
+    const [showNotificationPopup, setShowNotificationPopup] = useState(false);
 
     const insets = useSafeAreaInsets();
 
@@ -76,20 +82,49 @@ export const PublicProfileScreen = () => {
         };
     }, [userId, currentUser]);
 
+    useEffect(() => {
+        if (currentUser && userId) {
+            fetchNotificationSettings();
+        }
+    }, [currentUser, userId]);
+
+    const fetchNotificationSettings = async () => {
+        if (!currentUser) return;
+        const settings = await getNotificationSettings(currentUser.uid, userId);
+        setNotificationSettings(settings);
+    };
+
     const handleFollowToggle = async () => {
         if (!currentUser) {
             Alert.alert('Giriş Yap', 'Takip etmek için giriş yapmalısın.');
             return;
         }
 
-        try {
-            if (isFollowing) {
-                await unfollowUser(currentUser.uid, userId);
-            } else {
+        if (isFollowing) {
+            Alert.alert(
+                'Takibi Bırak',
+                `@${profile?.username} kullanıcısını takibi bırakmak istediğine emin misin?`,
+                [
+                    { text: 'Vazgeç', style: 'cancel' },
+                    {
+                        text: 'Takibi Bırak',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                await unfollowUser(currentUser.uid, userId);
+                            } catch (error) {
+                                Alert.alert('Hata', 'İşlem gerçekleştirilemedi.');
+                            }
+                        }
+                    }
+                ]
+            );
+        } else {
+            try {
                 await followUser(currentUser.uid, userId);
+            } catch (error) {
+                Alert.alert('Hata', 'İşlem gerçekleştirilemedi.');
             }
-        } catch (error) {
-            Alert.alert('Hata', 'İşlem gerçekleştirilemedi.');
         }
     };
 
@@ -139,7 +174,19 @@ export const PublicProfileScreen = () => {
                         )}
                     </TouchableOpacity>
 
-                    <Text style={[styles.displayName, { color: theme.text, fontFamily: typography.display }]}>{profile?.display_name}</Text>
+                    <View style={styles.nameSection}>
+                        <Text style={[styles.displayName, { color: getGoldUsernameColor(profile?.level || 1) || theme.text, fontFamily: typography.display }]}>
+                            {profile?.display_name}
+                        </Text>
+                        <View style={styles.badgeRow}>
+                            {(profile?.is_verified || profile?.level >= 10) && (
+                                <VerificationBadge size={18} />
+                            )}
+                            {(profile?.level >= 5) && (
+                                <LevelBadge level={profile.level} size={20} />
+                            )}
+                        </View>
+                    </View>
 
                     <View style={styles.statsRow}>
                         <View style={styles.statItem}>
@@ -159,18 +206,66 @@ export const PublicProfileScreen = () => {
                     <Text style={[styles.bio, { color: theme.secondaryText, fontFamily: typography.body }]}>{profile?.bio || 'Biyografi yok.'}</Text>
 
                     {currentUser?.uid !== userId && (
-                        <TouchableOpacity
-                            style={[styles.followButton, { backgroundColor: isFollowing ? 'transparent' : colors.saffron, borderColor: colors.saffron, borderWidth: 1 }]}
-                            onPress={handleFollowToggle}
-                        >
-                            <Text style={[styles.followButtonText, { color: isFollowing ? colors.saffron : colors.warmWhite, fontFamily: typography.bodyMedium }]}>
-                                {isFollowing ? 'Takibi Bırak' : 'Takip Et'}
-                            </Text>
-                        </TouchableOpacity>
+                        <View style={styles.actionRow}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.followButton,
+                                    {
+                                        backgroundColor: isFollowing ? colors.spiceRed : colors.saffron,
+                                        borderColor: isFollowing ? colors.spiceRed : colors.saffron,
+                                        borderWidth: 1
+                                    }
+                                ]}
+                                onPress={handleFollowToggle}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    {isFollowing ? (
+                                        <UserCheck size={18} color={colors.warmWhite} />
+                                    ) : (
+                                        <UserPlus size={18} color={colors.warmWhite} />
+                                    )}
+                                    <Text style={[styles.followButtonText, { color: colors.warmWhite, fontFamily: typography.bodyMedium }]}>
+                                        {isFollowing ? 'Takibi Bırak' : 'Takip Et'}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.squareButton, { borderColor: theme.border, borderWidth: 1 }]}
+                                onPress={() => {
+                                    Share.share({
+                                        message: `neyesem'de @${profile?.username} kullanıcısına göz at!`,
+                                        url: `https://neyesem.app/user/${userId}`
+                                    });
+                                }}
+                            >
+                                <Share2 size={20} color={theme.text} strokeWidth={2} />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.squareButton, { borderColor: theme.border, borderWidth: 1 }]}
+                                onPress={() => setShowNotificationPopup(true)}
+                            >
+                                <Bell
+                                    size={20}
+                                    color={notificationSettings?.posts || notificationSettings?.stories ? colors.saffron : theme.text}
+                                    strokeWidth={notificationSettings?.posts || notificationSettings?.stories ? 3 : 2}
+                                />
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
 
-                <AnimatedLevelCard mini level={profile?.level || 1} xp={profile?.xp || 0} xpNext={profile?.xp_next_level || 100} levelName={profile?.level_name || 'Gurme'} />
+                <View style={{ marginHorizontal: -16 }}>
+                    <AnimatedLevelCard
+                        level={profile?.level || 1}
+                        xp={profile?.xp || 0}
+                        xpNext={profile?.xp_next_level || 100}
+                        levelName={profile?.level_name || 'Gurme'}
+                        rank={profile?.rank || (profile?.level * 1234 % 1000) + 1} // Fallback for demo if rank not in DB
+                        badges={['Mutfak Ustası', 'Tat Dedektifi']} // Mock badges for the redesign impact
+                    />
+                </View>
 
                 <View style={styles.postsSection}>
                     <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.display }]}>Gönderiler</Text>
@@ -205,6 +300,15 @@ export const PublicProfileScreen = () => {
             )}
 
             <StoryViewer visible={viewerVisible} stories={activeStories} onClose={() => setViewerVisible(false)} />
+
+            <NotificationSettingsPopup
+                isVisible={showNotificationPopup}
+                onClose={() => setShowNotificationPopup(false)}
+                targetUserId={userId}
+                currentUserId={currentUser?.uid || ''}
+                targetUsername={profile?.username || ''}
+                onSettingsChanged={fetchNotificationSettings}
+            />
         </View>
     );
 };
@@ -219,18 +323,45 @@ const styles = StyleSheet.create({
     avatarContainer: { width: 100, height: 100, borderRadius: 50, marginBottom: 16, justifyContent: 'center', alignItems: 'center' },
     avatarImage: { width: '100%', height: '100%', borderRadius: 50 },
     avatarFallback: { width: '100%', height: '100%', borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
-    displayName: { fontSize: 24, marginBottom: 16 },
+    displayName: { fontSize: 24, textAlign: 'center' },
+    nameSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginBottom: 16,
+        paddingHorizontal: 20,
+    },
+    badgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingTop: 4, // Fine-tune vertical alignment with display name
+    },
     statsRow: { flexDirection: 'row', width: '100%', justifyContent: 'space-around', marginBottom: 20 },
-    statItem: { alignItems: 'center' },
+    statItem: { alignItems: 'center', flex: 1 },
     statValue: { fontSize: 18 },
     statLabel: { fontSize: 12, opacity: 0.7 },
     bio: { fontSize: 14, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-    followButton: { width: '100%', height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+    actionRow: {
+        flexDirection: 'row',
+        width: '100%',
+        gap: 10,
+        marginBottom: 24,
+    },
+    followButton: { flex: 1, height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    squareButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     followButtonText: { fontSize: 15 },
     postsSection: { paddingHorizontal: 16, marginTop: 20 },
     sectionTitle: { fontSize: 18, marginBottom: 16 },
     postsGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -2 },
-    gridItem: { width: GRID_ITEM_SIZE, height: GRID_ITEM_SIZE * 1.33, padding: 2 },
-    gridImage: { width: '100%', height: '100%', borderRadius: 12 },
+    gridItem: { width: GRID_ITEM_SIZE, height: GRID_ITEM_SIZE * 1.7, padding: 3 },
+    gridImage: { width: '100%', height: '100%', borderRadius: 16 },
     emptyState: { alignItems: 'center', paddingVertical: 40 },
 });

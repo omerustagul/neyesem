@@ -21,6 +21,7 @@ import {
     View,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView, TouchableOpacity } from 'react-native-gesture-handler';
+import { Portal } from 'react-native-paper';
 import Animated, {
     Extrapolate,
     interpolate,
@@ -37,6 +38,8 @@ import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { SelectionOption, SelectionPopup } from '../common/SelectionPopup';
 import { UserAvatar } from '../common/UserAvatar';
+import { VerificationBadge } from '../common/VerificationBadge';
+import { LevelBadge } from '../level/LevelBadge';
 
 const { width, height } = Dimensions.get('window');
 
@@ -494,178 +497,204 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
                 onRequestClose={safeOnClose}
             >
                 <GestureHandlerRootView style={{ flex: 1 }}>
-                    <StatusBar hidden />
-                    <View style={styles.modalBg}>
-                        <Animated.View style={[styles.container, dismissAnimatedStyle]}>
-                            <GestureDetector gesture={composedGesture}>
-                                <View style={StyleSheet.absoluteFill}>
+                    <Portal.Host>
+                        <StatusBar hidden />
+                        <View style={styles.modalBg}>
+                            <Animated.View style={[styles.container, dismissAnimatedStyle]}>
+                                <GestureDetector gesture={composedGesture}>
                                     <View style={StyleSheet.absoluteFill}>
-                                        <Animated.View style={[StyleSheet.absoluteFill, mediaAnimatedStyle]}>
-                                            <View style={styles.mediaContainer} pointerEvents="none">
-                                                {currentStory.contentType === 'video' ? (
-                                                    <VideoView
-                                                        player={player}
-                                                        key={`video-${currentStory.id}`}
-                                                        style={styles.media}
-                                                        contentFit="cover"
-                                                        nativeControls={false}
-                                                    />
-                                                ) : (
-                                                    <Image
-                                                        source={{ uri: currentStory.contentUrl }}
-                                                        key={`image-${currentStory.id}`}
-                                                        style={styles.media}
-                                                        resizeMode="cover"
-                                                        onLoad={() => setIsMediaLoaded(true)}
-                                                    />
-                                                )}
-                                            </View>
-                                        </Animated.View>
-                                    </View>
-                                </View>
-                            </GestureDetector>
-
-                            <View
-                                style={[styles.overlay, { paddingTop: insets.top }]}
-                                pointerEvents="box-none"
-                            >
-                                <View style={styles.headerGlassContainer}>
-                                    <BlurView intensity={35} tint="dark" style={styles.headerBlur}>
-                                        <View style={styles.progressBarContainer}>
-                                            {stories.map((_, index) => (
-                                                <View key={index} style={styles.progressBarBackground}>
-                                                    <View
-                                                        style={[
-                                                            styles.progressBarFill,
-                                                            {
-                                                                width: index === currentIndex
-                                                                    ? `${progress}%`
-                                                                    : index < currentIndex ? '100%' : '0%'
-                                                            }
-                                                        ]}
-                                                    />
+                                        <View style={StyleSheet.absoluteFill}>
+                                            <Animated.View style={[StyleSheet.absoluteFill, mediaAnimatedStyle]}>
+                                                <View style={styles.mediaContainer} pointerEvents="none">
+                                                    {currentStory.contentType === 'video' ? (
+                                                        <VideoView
+                                                            player={player}
+                                                            key={`video-${currentStory.id}`}
+                                                            style={styles.media}
+                                                            contentFit="cover"
+                                                            nativeControls={false}
+                                                        />
+                                                    ) : (
+                                                        <Image
+                                                            source={{ uri: currentStory.contentUrl }}
+                                                            key={`image-${currentStory.id}`}
+                                                            style={styles.media}
+                                                            resizeMode="cover"
+                                                            onLoad={() => setIsMediaLoaded(true)}
+                                                        />
+                                                    )}
                                                 </View>
-                                            ))}
+                                            </Animated.View>
                                         </View>
-
-                                        <View style={styles.header}>
-                                            <View style={styles.userInfo}>
-                                                <UserAvatar
-                                                    userId={currentStory.userId}
-                                                    size={36}
-                                                    style={styles.userAvatar}
-                                                />
-                                                <View>
-                                                    <Text style={styles.username}>{currentStory.username}</Text>
-                                                    <Text style={styles.timestamp}>{formatTime(currentStory.createdAt)}</Text>
-                                                </View>
-                                            </View>
-                                            <RNReactNativeTouchableOpacity
-                                                onPress={onClose}
-                                                style={styles.closeButton}
-                                            >
-                                                <X color="#fff" size={28} />
-                                            </RNReactNativeTouchableOpacity>
-                                        </View>
-                                    </BlurView>
-                                </View>
-
-                                {!!currentStory.text && (
-                                    <View style={styles.textOverlay} pointerEvents="none">
-                                        <Text style={[styles.storyText, { color: currentStory.textColor || '#fff' }]}>
-                                            {currentStory.text}
-                                        </Text>
                                     </View>
-                                )}
+                                </GestureDetector>
 
-                                {isOwner && (
-                                    <View style={[styles.bottomBarGlassContainer, { bottom: insets.bottom + 10 }]}>
-                                        <BlurView intensity={35} tint="dark" style={styles.bottomBlur}>
-                                            <View style={styles.bottomBarContent}>
-                                                <RNReactNativeTouchableOpacity style={styles.bottomBarButton} onPress={handleActivityPress}>
-                                                    <Eye color="#fff" size={20} />
-                                                    <Text style={styles.bottomBarText}>
-                                                        {currentStory.viewedBy?.length || 0}
-                                                    </Text>
-                                                </RNReactNativeTouchableOpacity>
-                                                <RNReactNativeTouchableOpacity style={styles.bottomBarButton} onPress={handleOptionsPress}>
-                                                    <MoreVertical color="#fff" size={20} />
-                                                    <Text style={styles.bottomBarText}>Seçenekler</Text>
+                                <View
+                                    style={[styles.overlay, { paddingTop: insets.top }]}
+                                    pointerEvents="box-none"
+                                >
+                                    <View style={styles.headerGlassContainer}>
+                                        <BlurView intensity={35} tint="dark" style={styles.headerBlur}>
+                                            <View style={styles.progressBarContainer}>
+                                                {stories.map((_, index) => (
+                                                    <View key={index} style={styles.progressBarBackground}>
+                                                        <View
+                                                            style={[
+                                                                styles.progressBarFill,
+                                                                {
+                                                                    width: index === currentIndex
+                                                                        ? `${progress}%`
+                                                                        : index < currentIndex ? '100%' : '0%'
+                                                                }
+                                                            ]}
+                                                        />
+                                                    </View>
+                                                ))}
+                                            </View>
+
+                                            <View style={styles.header}>
+                                                <View style={styles.userInfo}>
+                                                    <UserAvatar
+                                                        userId={currentStory.userId}
+                                                        size={36}
+                                                        style={styles.userAvatar}
+                                                    />
+                                                    <View>
+                                                        <Text style={styles.username}>{currentStory.username}</Text>
+                                                        <Text style={styles.timestamp}>{formatTime(currentStory.createdAt)}</Text>
+                                                    </View>
+                                                </View>
+                                                <RNReactNativeTouchableOpacity
+                                                    onPress={onClose}
+                                                    style={styles.closeButton}
+                                                >
+                                                    <X color="#fff" size={28} />
                                                 </RNReactNativeTouchableOpacity>
                                             </View>
                                         </BlurView>
                                     </View>
-                                )}
-                            </View>
-                        </Animated.View>
 
-                        <Modal
-                            visible={showViewers}
-                            transparent={true}
-                            animationType="fade"
-                            onRequestClose={handleCloseViewers}
-                        >
-                            <View style={styles.viewersModalContainer}>
-                                <RNReactNativeTouchableOpacity
-                                    activeOpacity={1}
-                                    style={StyleSheet.absoluteFill}
-                                    onPress={handleCloseViewers}
-                                >
-                                    <BlurView intensity={40} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-                                </RNReactNativeTouchableOpacity>
-                                <Animated.View style={[styles.viewersContent, viewersAnimatedStyle, { backgroundColor: isDark ? 'rgba(15,15,15,0.95)' : 'rgba(255,255,255,0.95)' }]}>
-                                    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
-                                        <View style={[styles.viewersHeader, { borderBottomColor: theme.border }]}>
-                                            <Text style={[styles.viewersTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>Görüntüleyenler</Text>
-                                            <TouchableOpacity onPress={handleCloseViewers}>
-                                                <X color={theme.text} size={24} />
-                                            </TouchableOpacity>
+                                    {!!currentStory.text && (
+                                        <View
+                                            style={[
+                                                styles.textOverlay,
+                                                {
+                                                    left: width / 2 + (currentStory.textX || 0),
+                                                    top: height / 2 + (currentStory.textY || 0),
+                                                    transform: [
+                                                        { translateX: -100 },
+                                                        { scale: currentStory.textScale || 1 },
+                                                        { rotate: `${currentStory.textRotation || 0}rad` },
+                                                    ],
+                                                }
+                                            ]}
+                                            pointerEvents="none"
+                                        >
+                                            <Text style={[
+                                                styles.storyText,
+                                                {
+                                                    color: currentStory.textColor || '#fff',
+                                                    fontSize: currentStory.textFontSize || 28,
+                                                }
+                                            ]}>
+                                                {currentStory.text}
+                                            </Text>
                                         </View>
+                                    )}
 
-                                        <FlatList
-                                            data={viewersData}
-                                            keyExtractor={(item) => item.id}
-                                            renderItem={({ item }) => (
-                                                <View style={styles.viewerItem}>
-                                                    <UserAvatar
-                                                        userId={item.id}
-                                                        size={38}
-                                                        style={styles.viewerAvatar}
-                                                    />
-                                                    <View>
-                                                        <Text style={[styles.viewerName, { color: theme.text, fontFamily: typography.bodyMedium }]}>{item.display_name}</Text>
-                                                        <Text style={[styles.viewerUsername, { color: theme.secondaryText }]}>@{item.username}</Text>
-                                                    </View>
+                                    {isOwner && (
+                                        <View style={[styles.bottomBarGlassContainer, { bottom: insets.bottom + 10 }]}>
+                                            <BlurView intensity={35} tint="dark" style={styles.bottomBlur}>
+                                                <View style={styles.bottomBarContent}>
+                                                    <RNReactNativeTouchableOpacity style={styles.bottomBarButton} onPress={handleActivityPress}>
+                                                        <Eye color="#fff" size={20} />
+                                                        <Text style={styles.bottomBarText}>
+                                                            {currentStory.viewedBy?.length || 0}
+                                                        </Text>
+                                                    </RNReactNativeTouchableOpacity>
+                                                    <RNReactNativeTouchableOpacity style={styles.bottomBarButton} onPress={handleOptionsPress}>
+                                                        <MoreVertical color="#fff" size={20} />
+                                                        <Text style={styles.bottomBarText}>Seçenekler</Text>
+                                                    </RNReactNativeTouchableOpacity>
                                                 </View>
-                                            )}
-                                            ListEmptyComponent={
-                                                <Text style={[styles.emptyViewers, { color: theme.secondaryText }]}>
-                                                    {isLoadingViewers ? 'Yükleniyor...' : 'Henüz kimse görüntülemedi.'}
-                                                </Text>
-                                            }
-                                            contentContainerStyle={styles.viewersList}
-                                        />
-                                    </SafeAreaView>
-                                </Animated.View>
-                            </View>
-                        </Modal>
+                                            </BlurView>
+                                        </View>
+                                    )}
+                                </View>
+                            </Animated.View>
 
-                        <SelectionPopup
-                            visible={showOptions}
-                            title="Hikaye Seçenekleri"
-                            options={storyOptions}
-                            onClose={() => {
-                                // Close options and resume playback
-                                setShowOptions(false);
-                                setIsPaused(false);
-                                try {
-                                    if (player && typeof player.play === 'function') {
-                                        player.play();
-                                    }
-                                } catch { /* ignore */ }
-                            }}
-                        />
-                    </View>
+                            <Modal
+                                visible={showViewers}
+                                transparent={true}
+                                animationType="fade"
+                                onRequestClose={handleCloseViewers}
+                            >
+                                <View style={styles.viewersModalContainer}>
+                                    <RNReactNativeTouchableOpacity
+                                        activeOpacity={1}
+                                        style={StyleSheet.absoluteFill}
+                                        onPress={handleCloseViewers}
+                                    >
+                                        <BlurView intensity={40} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+                                    </RNReactNativeTouchableOpacity>
+                                    <Animated.View style={[styles.viewersContent, viewersAnimatedStyle, { backgroundColor: isDark ? 'rgba(15,15,15,0.95)' : 'rgba(255,255,255,0.95)' }]}>
+                                        <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+                                            <View style={[styles.viewersHeader, { borderBottomColor: theme.border }]}>
+                                                <Text style={[styles.viewersTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>Görüntüleyenler</Text>
+                                                <TouchableOpacity onPress={handleCloseViewers}>
+                                                    <X color={theme.text} size={24} />
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            <FlatList
+                                                data={viewersData}
+                                                keyExtractor={(item) => item.id}
+                                                renderItem={({ item }) => (
+                                                    <View style={styles.viewerItem}>
+                                                        <UserAvatar
+                                                            userId={item.id}
+                                                            size={38}
+                                                            style={styles.viewerAvatar}
+                                                        />
+                                                        <View>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                                <Text style={[styles.viewerName, { color: theme.text, fontFamily: typography.bodyMedium }]}>{item.display_name}</Text>
+                                                                {(item.is_verified || (item.level || 1) >= 10) && <VerificationBadge size={13} />}
+                                                                {(item.level || 1) >= 5 && <LevelBadge level={item.level || 1} size={15} />}
+                                                            </View>
+                                                            <Text style={[styles.viewerUsername, { color: theme.secondaryText }]}>@{item.username}</Text>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                ListEmptyComponent={
+                                                    <Text style={[styles.emptyViewers, { color: theme.secondaryText }]}>
+                                                        {isLoadingViewers ? 'Yükleniyor...' : 'Henüz kimse görüntülemedi.'}
+                                                    </Text>
+                                                }
+                                                contentContainerStyle={styles.viewersList}
+                                            />
+                                        </SafeAreaView>
+                                    </Animated.View>
+                                </View>
+                            </Modal>
+
+                            <SelectionPopup
+                                visible={showOptions}
+                                title="Hikaye Seçenekleri"
+                                options={storyOptions}
+                                onClose={() => {
+                                    // Close options and resume playback
+                                    setShowOptions(false);
+                                    setIsPaused(false);
+                                    try {
+                                        if (player && typeof player.play === 'function') {
+                                            player.play();
+                                        }
+                                    } catch { /* ignore */ }
+                                }}
+                            />
+                        </View>
+                    </Portal.Host>
                 </GestureHandlerRootView>
             </Modal>
         </>
@@ -768,11 +797,8 @@ const styles = StyleSheet.create({
     },
     textOverlay: {
         position: 'absolute',
-        top: height * 0.4,
-        left: 0,
-        right: 0,
+        width: 200,
         alignItems: 'center',
-        paddingHorizontal: 40,
     },
     storyText: {
         fontSize: 28,

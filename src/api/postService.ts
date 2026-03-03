@@ -1,6 +1,7 @@
 import { addDoc, arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, increment, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { checkBadgesOnLike, checkBadgesOnPost, checkBadgesOnSave } from './badgeService';
 import { db } from './firebase';
-import { createNotification } from './notificationService';
+import { createNotification, notifySubscribers } from './notificationService';
 import { sendPalateSignal } from './palateService';
 
 export type FoodCategory = 'meal' | 'dessert' | 'snack' | 'beverage' | 'breakfast' | 'appetizer';
@@ -30,6 +31,7 @@ export interface Post {
     thumbnail_url?: string;
     tags?: string[];
     ingredients?: string[];
+    recipe_steps?: string[];
     chainId?: string;
     parentPostId?: string;
     isChainRoot?: boolean;
@@ -97,6 +99,14 @@ export const createPost = async (
         await updateDoc(doc(db, 'profiles', userId), {
             post_count: increment(1),
         });
+
+        // Notify subscribers
+        await notifySubscribers(userId, 'new_post', { postId: docRef.id, post_thumbnail_url: thumbnail_url || '' });
+
+        // Badge check — fire and forget
+        checkBadgesOnPost(userId, docRef.id, {
+            cuisineId: foodCategory || undefined,
+        }).catch(() => { });
 
         return docRef.id;
     } catch (error) {
@@ -382,9 +392,13 @@ export const togglePostLike = async (
                     'like',
                     `gönderini beğendi.`,
                     undefined,
-                    { postId }
+                    { postId, post_thumbnail_url: post.thumbnail_url || '' }
                 );
             }
+
+            // Badge check — fire and forget
+            const newLikesCount = (post.likes_count || 0) + 1;
+            checkBadgesOnLike(userId, post.userId, postId, newLikesCount).catch(() => { });
         }
     } catch (error) {
         console.error('Error toggling like:', error);
@@ -421,6 +435,9 @@ export const togglePostSave = async (
                 saved_by: arrayUnion(userId),
                 saves_count: increment(1),
             });
+
+            // Badge check — fire and forget
+            checkBadgesOnSave(userId).catch(() => { });
         }
     } catch (error) {
         console.error('Error toggling save:', error);

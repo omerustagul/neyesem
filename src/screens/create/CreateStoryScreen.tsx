@@ -52,6 +52,8 @@ import { useLevelStore } from '../../store/levelStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 
+import { notifySubscribers } from '../../api/notificationService';
+
 const { width, height } = Dimensions.get('window');
 
 type Tool = 'text' | 'music' | 'sticker' | null;
@@ -70,6 +72,7 @@ export const CreateStoryScreen = ({ navigation }: any) => {
     const [activeTool, setActiveTool] = useState<Tool>(null);
     const [textContent, setTextContent] = useState('');
     const [textColor, setTextColor] = useState('#ffffff');
+    const [textFontSize, setTextFontSize] = useState(38);
     const [isTrashActive, setIsTrashActive] = useState(false);
 
     // Gesture Shared Values
@@ -83,6 +86,10 @@ export const CreateStoryScreen = ({ navigation }: any) => {
     const savedScale = useSharedValue(1);
     const savedRotation = useSharedValue(0);
     const context = useSharedValue({ x: 0, y: 0 });
+
+    // Snap guide visibility
+    const [showSnapX, setShowSnapX] = React.useState(false);
+    const [showSnapY, setShowSnapY] = React.useState(false);
 
     // Initialize expo-video player
     const player = useVideoPlayer(mediaType === 'video' ? media : '', (player: any) => {
@@ -200,10 +207,18 @@ export const CreateStoryScreen = ({ navigation }: any) => {
                 contentType: mediaType,
                 text: textContent,
                 textColor,
+                textX: translateX.value,
+                textY: translateY.value,
+                textScale: scale.value,
+                textRotation: rotation.value,
+                textFontSize,
                 createdAt: serverTimestamp(),
                 expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
                 viewedBy: []
             });
+
+            // Notify subscribers
+            await notifySubscribers(user.uid, 'new_story', { story_thumbnail_url: contentUrl });
 
             // Reward XP
             const { addXP } = useLevelStore.getState();
@@ -225,8 +240,29 @@ export const CreateStoryScreen = ({ navigation }: any) => {
             context.value = { x: translateX.value, y: translateY.value };
         })
         .onUpdate((event) => {
-            translateX.value = context.value.x + event.translationX;
-            translateY.value = context.value.y + event.translationY;
+            const newX = context.value.x + event.translationX;
+            const newY = context.value.y + event.translationY;
+
+            // Snap to center X (±12px)
+            const snapThreshold = 12;
+            if (Math.abs(newX) < snapThreshold) {
+                translateX.value = 0;
+                runOnJS(setShowSnapY)(true);
+                runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+            } else {
+                translateX.value = newX;
+                runOnJS(setShowSnapY)(false);
+            }
+
+            // Snap to center Y (±12px)
+            if (Math.abs(newY) < snapThreshold) {
+                translateY.value = 0;
+                runOnJS(setShowSnapX)(true);
+                runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+            } else {
+                translateY.value = newY;
+                runOnJS(setShowSnapX)(false);
+            }
 
             // Check trash collision (bottom center)
             const trashY = height - 150;
@@ -239,6 +275,8 @@ export const CreateStoryScreen = ({ navigation }: any) => {
         })
         .onEnd(() => {
             isDragging.value = false;
+            runOnJS(setShowSnapX)(false);
+            runOnJS(setShowSnapY)(false);
             const trashY = height - 150;
             const currentY = height / 2 + translateY.value;
 
@@ -298,15 +336,30 @@ export const CreateStoryScreen = ({ navigation }: any) => {
 
     const renderOverlay = () => (
         <View style={styles.overlayContainer} pointerEvents="box-none">
+            {/* Horizontal center snap guide - green */}
+            {showSnapX && (
+                <View style={[styles.snapGuideH, { backgroundColor: 'rgba(20,133,74,0.85)', borderColor: 'rgba(20,133,74,0.85)' }]} pointerEvents="none" />
+            )}
+            {/* Vertical center snap guide - green */}
+            {showSnapY && (
+                <View style={[styles.snapGuideV, { backgroundColor: 'rgba(20,133,74,0.85)', borderColor: 'rgba(20,133,74,0.85)' }]} pointerEvents="none" />
+            )}
             {textContent ? (
                 <GestureDetector gesture={composedGesture}>
                     <Animated.View style={[styles.textOverlay, animatedTextStyle]}>
-                        <Text style={[styles.previewText, { color: textColor }]}>{textContent}</Text>
+                        {/* Tap on text to re-open editor */}
+                        <TouchableOpacity
+                            onPress={() => setActiveTool('text')}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[styles.previewText, { color: textColor, fontSize: textFontSize }]}>{textContent}</Text>
+                        </TouchableOpacity>
                     </Animated.View>
                 </GestureDetector>
             ) : null}
         </View>
     );
+
 
     const renderTrash = () => (
         <AnimatePresence>
@@ -417,8 +470,28 @@ export const CreateStoryScreen = ({ navigation }: any) => {
                                 <Check color="#fff" size={32} />
                             </TouchableOpacity>
 
+                            {/* Instagram-style vertical font size slider on the left */}
+                            <View style={styles.fontSizeSliderContainer}>
+                                {/* Slider track */}
+                                <View style={styles.fontSizeTrack}>
+                                    {[16, 22, 28, 34, 40, 48, 58].reverse().map((size) => (
+                                        <TouchableOpacity
+                                            key={size}
+                                            style={[styles.fontSizeStep, {
+                                                backgroundColor: textFontSize >= size ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)',
+                                                height: 6 + (size - 16) * 0.3,
+                                                width: 6 + (size - 16) * 0.3,
+                                                borderRadius: 50,
+                                            }]}
+                                            onPress={() => setTextFontSize(size)}
+                                        />
+                                    ))}
+                                </View>
+                                <Text style={{ color: '#fff', fontSize: 11, marginTop: 8 }}>Aa</Text>
+                            </View>
+
                             <TextInput
-                                style={[styles.textToolInput, { color: textColor }]}
+                                style={[styles.textToolInput, { color: textColor, fontSize: textFontSize }]}
                                 placeholder="Bir şeyler yaz..."
                                 placeholderTextColor="rgba(255,255,255,0.4)"
                                 value={textContent}
@@ -610,5 +683,40 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
+    },
+    snapGuideH: {
+        position: 'absolute',
+        top: '50%',
+        left: 0,
+        right: 0,
+        height: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.6)',
+        borderStyle: 'dashed',
+        borderWidth: 0.5,
+        borderColor: 'rgba(255,255,255,0.6)',
+    },
+    snapGuideV: {
+        position: 'absolute',
+        left: '50%',
+        top: 0,
+        bottom: 0,
+        width: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.6)',
+        borderStyle: 'dashed',
+        borderWidth: 0.5,
+        borderColor: 'rgba(255,255,255,0.6)',
+    },
+    fontSizeSliderContainer: {
+        position: 'absolute',
+        left: 20,
+        top: '30%',
+        alignItems: 'center',
+    },
+    fontSizeTrack: {
+        gap: 8,
+        alignItems: 'center',
+    },
+    fontSizeStep: {
+        // dynamic sizing applied inline
     },
 });

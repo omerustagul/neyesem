@@ -166,8 +166,8 @@ const styles = StyleSheet.create({
     container: {
         position: 'absolute',
         bottom: 18,
-        left: 20,
-        right: 20,
+        left: 12,
+        right: 12,
         alignItems: 'center',
     },
     tabBar: {
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     },
     backgroundContainer: {
         ...StyleSheet.absoluteFillObject,
-        borderRadius: 32,
+        borderRadius: 28,
         borderWidth: 1,
         overflow: 'hidden',
         shadowColor: '#0A6C40',

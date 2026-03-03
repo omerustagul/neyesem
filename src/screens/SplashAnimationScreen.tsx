@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur';
 import React, { useEffect } from 'react';
 import { Dimensions, Image, StyleSheet, Text, View } from 'react-native';
 import Animated, {
@@ -6,8 +7,6 @@ import Animated, {
     useAnimatedStyle,
     useSharedValue,
     withDelay,
-    withRepeat,
-    withSequence,
     withSpring,
     withTiming
 } from 'react-native-reanimated';
@@ -37,48 +36,19 @@ export const SplashAnimationScreen: React.FC<SplashAnimationScreenProps> = ({ on
     }, []);
 
     const startAnimation = () => {
-        // 1. Logo Entry
-        logoOpacity.value = withTiming(1, { duration: 600 });
-        logoScale.value = withSequence(
-            withSpring(1.2, { damping: 12, stiffness: 100 }),
-            withSpring(1, { damping: 15, stiffness: 100 })
-        );
+        // Total sequence: ~500ms
+        // 1. Logo Entry (200ms)
+        logoOpacity.value = withTiming(1, { duration: 250 });
+        logoScale.value = withSpring(1, { damping: 12, stiffness: 120 });
 
-        // 2. Glow Pulse
-        glowOpacity.value = withDelay(
-            300,
-            withRepeat(
-                withSequence(
-                    withTiming(0.6, { duration: 800 }),
-                    withTiming(0.2, { duration: 800 })
-                ),
-                -1,
-                true
-            )
-        );
-        glowScale.value = withDelay(
-            300,
-            withRepeat(
-                withSequence(
-                    withTiming(1.4, { duration: 800 }),
-                    withTiming(1.1, { duration: 800 })
-                ),
-                -1,
-                true
-            )
-        );
+        // 2. Title & Shine (Concurrent with logo, 300ms)
+        titleOpacity.value = withDelay(150, withTiming(1, { duration: 250 }));
+        titleY.value = withDelay(150, withSpring(0, { damping: 15, stiffness: 100 }));
 
-        // 3. Title Entry
-        titleOpacity.value = withDelay(600, withTiming(1, { duration: 800 }));
-        titleY.value = withDelay(
-            600,
-            withSpring(0, { damping: 15, stiffness: 100 })
-        );
-
-        // 4. Fade out and Finish
+        // 3. Fade out and Finish (Starts at 500ms mark)
         containerOpacity.value = withDelay(
-            2200,
-            withTiming(0, { duration: 600, easing: Easing.out(Easing.quad) }, (finished) => {
+            650,
+            withTiming(0, { duration: 350, easing: Easing.out(Easing.quad) }, (finished) => {
                 if (finished) {
                     runOnJS(onAnimationComplete)();
                 }
@@ -106,36 +76,39 @@ export const SplashAnimationScreen: React.FC<SplashAnimationScreenProps> = ({ on
     }));
 
     return (
-        <Animated.View style={[styles.container, containerStyle, { backgroundColor: isDark ? '#080e0b' : '#F0F4F1' }]}>
+        <Animated.View style={[styles.container, containerStyle, { backgroundColor: isDark ? '#080e0b' : '#F8FAF9' }]}>
             {/* Ambient Background Glow */}
-            <View style={styles.ambientGlow} />
+            <View style={[styles.ambientGlow, { backgroundColor: `${colors.saffron}05` }]} />
 
-            {/* Pulsing Glow Rings */}
-            <Animated.View style={[styles.glowRing, glowStyle, { borderColor: `${colors.saffron}66` }]} />
-            <Animated.View style={[styles.glowRingOuter, glowStyle, { borderColor: `${colors.saffron}33` }]} />
-
-            {/* Logo */}
+            {/* Logo Container with Glass Effect */}
             <Animated.View style={[styles.logoContainer, logoStyle]}>
-                <Image
-                    source={isDark ? require('../../assets/images/app_n_logo_dark_theme.webp') : require('../../assets/images/app_n_logo_light_theme.webp')}
-                    style={styles.logo}
-                    resizeMode="contain"
-                />
+                <View style={styles.glassCircle}>
+                    <BlurView
+                        intensity={isDark ? 20 : 40}
+                        tint={isDark ? 'dark' : 'light'}
+                        style={StyleSheet.absoluteFill}
+                    />
+                    <Image
+                        source={isDark ? require('../../assets/images/app_n_logo_dark_theme.webp') : require('../../assets/images/app_n_logo_light_theme.webp')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
+                </View>
             </Animated.View>
 
             {/* Title & Tagline */}
             <Animated.View style={[styles.titleContainer, titleStyle]}>
-                <Text style={[styles.appName, { fontFamily: typography.display, color: isDark ? '#FFF' : colors.saffron }]}>neyesem</Text>
+                <Text style={[styles.appName, { fontFamily: typography.display, color: isDark ? '#FFF' : '#1A1A1A' }]}>neyesem</Text>
                 <View style={styles.taglineRow}>
-                    <View style={[styles.line, { backgroundColor: `${colors.saffron}4D` }]} />
-                    <Text style={[styles.tagline, { fontFamily: typography.body, color: colors.saffron }]}>LEZZETİ KEŞFET</Text>
-                    <View style={[styles.line, { backgroundColor: `${colors.saffron}4D` }]} />
+                    <View style={[styles.line, { backgroundColor: isDark ? 'rgba(255,178,0,0.3)' : 'rgba(255,178,0,0.2)' }]} />
+                    <Text style={[styles.tagline, { fontFamily: typography.bodyMedium, color: colors.saffron }]}>LEZZETİ KEŞFET</Text>
+                    <View style={[styles.line, { backgroundColor: isDark ? 'rgba(255,178,0,0.3)' : 'rgba(255,178,0,0.2)' }]} />
                 </View>
             </Animated.View>
 
-            {/* Bottom Version (Optional) */}
+            {/* Bottom Version */}
             <View style={styles.bottomVersion}>
-                <Text style={styles.versionText}>v1.0.0</Text>
+                <Text style={[styles.versionText, { color: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)' }]}>PREMIUM EXPERIENCE</Text>
             </View>
         </Animated.View>
     );
@@ -150,70 +123,61 @@ const styles = StyleSheet.create({
     },
     ambientGlow: {
         position: 'absolute',
-        width: width * 1.5,
-        height: width * 1.5,
-        borderRadius: width * 0.75,
-        backgroundColor: `${colors.saffron}08`,
-    },
-    glowRing: {
-        position: 'absolute',
-        width: 180,
-        height: 180,
-        borderRadius: 90,
-        borderWidth: 1,
-    },
-    glowRingOuter: {
-        position: 'absolute',
-        width: 260,
-        height: 260,
-        borderRadius: 130,
-        borderWidth: 1,
+        width: width * 1.2,
+        height: width * 1.2,
+        borderRadius: width * 0.6,
     },
     logoContainer: {
-        width: 120,
-        height: 120,
+        width: 140,
+        height: 140,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: colors.saffron,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
-        elevation: 10,
+    },
+    glassCircle: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+        borderWidth: 1.5,
+        borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.05)',
     },
     logo: {
-        width: 100,
-        height: 100,
+        width: 70,
+        height: 70,
     },
     titleContainer: {
-        marginTop: 40,
+        marginTop: 30,
         alignItems: 'center',
     },
     appName: {
-        fontSize: 42,
-        color: '#FFFFFF',
-        letterSpacing: 2,
+        fontSize: 38,
+        letterSpacing: 4,
+        fontWeight: '200',
     },
     taglineRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 8,
+        marginTop: 10,
     },
     tagline: {
-        fontSize: 12,
-        letterSpacing: 4,
-        marginHorizontal: 12,
+        fontSize: 11,
+        letterSpacing: 5,
+        marginHorizontal: 15,
     },
     line: {
-        width: 20,
+        width: 30,
         height: 1,
     },
     bottomVersion: {
         position: 'absolute',
-        bottom: 50,
+        bottom: 60,
     },
     versionText: {
-        fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.3)',
-        letterSpacing: 2,
+        fontSize: 10,
+        letterSpacing: 3,
+        fontWeight: '600',
     }
 });

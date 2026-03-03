@@ -11,12 +11,15 @@ import { WebView } from 'react-native-webview';
 import { sendPalateSignal } from '../../api/palateService';
 import { archivePost, deletePost, Post, recordPostView } from '../../api/postService';
 import { useEmbed } from '../../hooks/useEmbed';
+import { useUserProfile } from '../../hooks/useUserProfile';
 import { useAuthStore } from '../../store/authStore';
 import { useLevelStore } from '../../store/levelStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 import { SelectionPopup } from '../common/SelectionPopup';
 import { UserAvatar } from '../common/UserAvatar';
+import { VerificationBadge } from '../common/VerificationBadge';
+import { getGoldUsernameColor, LevelBadge } from '../level/LevelBadge';
 import { CommentButton, InfoButton, LikeButton, SaveButton } from '../social/SocialButtons';
 import { WhySeeingThisPopup } from '../social/WhySeeingThisPopup';
 
@@ -56,6 +59,9 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
     const isFocused = useIsFocused();
     const { user } = useAuthStore();
     const { addXP } = useLevelStore();
+    const postAuthorProfile = useUserProfile(post.userId);
+    const postAuthorLevel = postAuthorProfile?.level ?? 1;
+    const postAuthorVerified = postAuthorProfile?.is_verified ?? false;
     const handleLikeWithXP = () => { onLike?.(); if (user?.uid) addXP(user.uid, 1); };
     const handleCommentWithXP = () => { onComment?.(); if (user?.uid) addXP(user.uid, 3); };
     const handleSaveWithXP = () => { onSave?.(); if (user?.uid) addXP(user.uid, 1); };
@@ -323,10 +329,23 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
                                 />
                             </View>
                             <View>
-                                {/* Text styled cleanly on overlay */}
-                                <Text style={[styles.username, { color: '#FFFFFF', fontFamily: typography.bodyMedium, textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }]}>
-                                    {post.display_name || post.username}
-                                </Text>
+                                {/* Username with level badge + verification */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <Text style={[
+                                        styles.username,
+                                        {
+                                            color: getGoldUsernameColor(postAuthorLevel) || '#FFFFFF',
+                                            fontFamily: typography.bodyMedium,
+                                            textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                                            textShadowOffset: { width: 0, height: 1 },
+                                            textShadowRadius: 2
+                                        }
+                                    ]}>
+                                        {post.display_name || post.username}
+                                    </Text>
+                                    {(postAuthorVerified || postAuthorLevel >= 10) && <VerificationBadge size={13} />}
+                                    {postAuthorLevel >= 5 && <LevelBadge level={postAuthorLevel} size={16} />}
+                                </View>
                             </View>
                         </TouchableOpacity>
 
@@ -386,6 +405,26 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
                     </BlurView>
                 </View>
             )}
+
+            {/* Inline Comment Input (Instagram Style) */}
+            <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleCommentWithXP}
+                style={styles.inlineCommentContainer}
+            >
+                {user?.photoURL ? (
+                    <ExpoImage source={{ uri: user.photoURL }} style={styles.inlineCommentAvatar} />
+                ) : (
+                    <View style={[styles.inlineCommentAvatarFallback, { backgroundColor: `${colors.saffron}20` }]}>
+                        <Text style={{ color: colors.saffron, fontSize: 10, fontWeight: '700' }}>
+                            {user?.displayName?.[0]?.toUpperCase() || '?'}
+                        </Text>
+                    </View>
+                )}
+                <Text style={[styles.inlineCommentText, { color: theme.secondaryText, fontFamily: typography.body }]}>
+                    Yorum ekle...
+                </Text>
+            </TouchableOpacity>
 
             {/* Food Info Cards */}
             {!!(post.cooking_time || post.difficulty || post.calories || post.protein) && (
@@ -559,7 +598,7 @@ const styles = StyleSheet.create({
     },
     mediaContainer: {
         width: width - 24,
-        marginHorizontal: 12,
+        marginHorizontal: 14,
         borderRadius: 24,
         aspectRatio: 0.7, // 4:3 Ratio (Instagram Style)
         backgroundColor: 'rgba(0,0,0,0.05)',
@@ -640,6 +679,28 @@ const styles = StyleSheet.create({
     caption: {
         fontSize: 14,
         lineHeight: 18,
+    },
+    inlineCommentContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        gap: 8,
+    },
+    inlineCommentAvatar: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+    },
+    inlineCommentAvatarFallback: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    inlineCommentText: {
+        fontSize: 13,
     },
     infoGrid: {
         flexDirection: 'row',

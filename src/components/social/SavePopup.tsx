@@ -1,4 +1,5 @@
 import BottomSheet, { BottomSheetBackdrop, BottomSheetFlatList, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { BlurView } from 'expo-blur';
 import { Bookmark, Check, Plus, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Keyboard, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -18,7 +19,7 @@ export const SavePopup: React.FC<SavePopupProps> = ({ postId, onClose }) => {
     const { theme, typography, isDark } = useTheme();
     const { user } = useAuthStore();
     const bottomSheetRef = useRef<BottomSheet>(null);
-    const snapPoints = useMemo(() => ['60%', '80%'], []);
+    const snapPoints = useMemo(() => ['55%', '88%'], []);
 
     const [lists, setLists] = useState<UserList[]>([]);
     const [savedListIds, setSavedListIds] = useState<string[]>([]);
@@ -80,10 +81,30 @@ export const SavePopup: React.FC<SavePopupProps> = ({ postId, onClose }) => {
                 appearsOnIndex={0}
                 disappearsOnIndex={-1}
                 onPress={onClose}
+                opacity={0.5}
             />
         ),
         [onClose]
     );
+
+    const renderBackground = useCallback(() => (
+        <View style={StyleSheet.absoluteFill}>
+            <BlurView
+                intensity={isDark ? 50 : 80}
+                tint={isDark ? 'dark' : 'light'}
+                style={[
+                    StyleSheet.absoluteFill,
+                    {
+                        backgroundColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.7)',
+                        borderRadius: 30,
+                        overflow: 'hidden',
+                        borderWidth: 1.5,
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                    }
+                ]}
+            />
+        </View>
+    ), [isDark]);
 
     const renderItem = ({ item }: { item: UserList }) => {
         const isSaved = savedListIds.includes(item.id);
@@ -123,10 +144,10 @@ export const SavePopup: React.FC<SavePopupProps> = ({ postId, onClose }) => {
                 index={0}
                 snapPoints={snapPoints}
                 backdropComponent={renderBackdrop}
-                enablePanDownToClose
+                backgroundComponent={renderBackground}
                 onClose={onClose}
-                backgroundStyle={{ backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
-                handleIndicatorStyle={{ backgroundColor: theme.border }}
+                backgroundStyle={{ backgroundColor: 'transparent' }}
+                handleIndicatorStyle={{ backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)', width: 40 }}
             >
                 <View style={styles.container}>
                     <View style={styles.header}>
@@ -210,23 +231,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.05)',
+        paddingVertical: 20,
     },
     title: {
-        fontSize: 16,
+        fontSize: 17,
+        fontWeight: '600',
     },
     createNewButton: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingVertical: 15,
+        paddingBottom: 20,
     },
     plusIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: `${colors.saffron}15`,
         alignItems: 'center',
         justifyContent: 'center',
@@ -243,17 +263,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
+        paddingVertical: 14,
     },
     listInfo: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     listIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
@@ -262,14 +281,15 @@ const styles = StyleSheet.create({
         fontSize: 15,
     },
     listCount: {
-        fontSize: 12,
+        fontSize: 11,
         marginTop: 2,
+        opacity: 0.6,
     },
     checkbox: {
-        width: 24,
-        height: 24,
-        borderRadius: 16,
-        borderWidth: 2,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -277,8 +297,8 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     input: {
-        height: 50,
-        borderRadius: 16,
+        height: 52,
+        borderRadius: 20,
         paddingHorizontal: 16,
         fontSize: 16,
         marginBottom: 20,
@@ -291,7 +311,7 @@ const styles = StyleSheet.create({
     button: {
         paddingHorizontal: 20,
         paddingVertical: 12,
-        borderRadius: 16,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
     },

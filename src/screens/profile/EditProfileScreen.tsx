@@ -4,6 +4,7 @@ import { ArrowLeft, Camera, Image as LucideImage } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { checkBadgesOnProfileUpdate } from '../../api/badgeService';
 import { db } from '../../api/firebase';
 import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassCard } from '../../components/glass/GlassCard';
@@ -215,6 +216,15 @@ export const EditProfileScreen = ({ navigation }: any) => {
             }
 
             await updateDoc(doc(db, 'profiles', user.uid), updateData);
+
+            // Badge check — fire and forget
+            checkBadgesOnProfileUpdate(user.uid, {
+                display_name: displayName,
+                avatar_url: avatarUrl,
+                bio,
+                username,
+            }).catch(() => { });
+
             Alert.alert('Başarılı', 'Profilin güncellendi!');
             navigation.goBack();
         } catch (error: any) {

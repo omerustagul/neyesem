@@ -1,7 +1,9 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { doc, onSnapshot } from 'firebase/firestore';
 import {
     Archive,
     ArrowLeft,
+    BadgeCheck,
     Bell,
     ChevronRight,
     HeartPulse,
@@ -140,6 +142,7 @@ export const SettingsScreen = ({ navigation }: any) => {
                 <Text style={[styles.largeTitle, { color: theme.text, fontFamily: typography.display }]}>
                     Ayarlar
                 </Text>
+
                 <Text style={[styles.sectionTitle, { color: theme.secondaryText, fontFamily: typography.bodyMedium }]}>Hesap</Text>
                 <GlassCard style={styles.sectionCard} contentStyle={{ padding: 0 }}>
                     <SettingsItem
@@ -201,6 +204,35 @@ export const SettingsScreen = ({ navigation }: any) => {
                         onPress={() => { }}
                     />
                 </GlassCard>
+
+                {/* ── Verification badge banner (shown when not verified) ── */}
+                {!profile?.is_verified && (
+                    <TouchableOpacity
+                        activeOpacity={0.88}
+                        style={[styles.badgeBannerWrapper, { marginTop: 12 }]}
+                        onPress={() => navigation.navigate('VerificationInfo')}
+                    >
+                        <LinearGradient
+                            colors={['#fbbf24', '#f59e0b', '#b45309']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.badgeBanner}
+                        >
+                            <View style={styles.badgeBannerIcon}>
+                                <BadgeCheck size={28} color="#fff" strokeWidth={2} />
+                            </View>
+                            <View style={styles.badgeBannerText}>
+                                <Text style={[styles.badgeBannerTitle, { fontFamily: typography.bodyMedium }]}>
+                                    Doğrulanmış Rozet Al
+                                </Text>
+                                <Text style={[styles.badgeBannerSub, { fontFamily: typography.body }]}>
+                                    ₺249,90/ay · Topluluğun güvenini kazan
+                                </Text>
+                            </View>
+                            <ChevronRight size={20} color="rgba(255,255,255,0.8)" />
+                        </LinearGradient>
+                    </TouchableOpacity>
+                )}
 
                 {/* Sign Out Section */}
                 <View style={styles.signOutSection}>
@@ -267,7 +299,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     sectionCard: {
-        borderRadius: 28,
+        borderRadius: 24,
         marginBottom: 8,
         overflow: 'hidden',
     },
@@ -295,6 +327,44 @@ const styles = StyleSheet.create({
         fontSize: 13,
     },
     signOutSection: {
-        marginTop: 20,
+        marginTop: 0,
+    },
+    badgeBannerWrapper: {
+        borderRadius: 20,
+        overflow: 'hidden',
+        marginBottom: 20,
+        shadowColor: '#f59e0b',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    badgeBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        gap: 14,
+        borderRadius: 24,
+    },
+    badgeBannerIcon: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    badgeBannerText: {
+        flex: 1,
+    },
+    badgeBannerTitle: {
+        color: '#fff',
+        fontSize: 15,
+        marginBottom: 3,
+    },
+    badgeBannerSub: {
+        color: 'rgba(255,255,255,0.82)',
+        fontSize: 12,
     },
 });

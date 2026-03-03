@@ -1,5 +1,6 @@
-import { NotificationProvider } from '@/src/context/NotificationContext';
+import { BadgeInfoPopup } from '@/src/components/common/BadgeInfoPopup';
 import { GlobalRefreshProvider } from '@/src/context/GlobalRefreshContext';
+import { NotificationProvider } from '@/src/context/NotificationContext';
 import { XPProvider } from '@/src/context/XPContext';
 import { RootNavigator } from '@/src/navigation/RootNavigator';
 import { SplashAnimationScreen } from '@/src/screens/SplashAnimationScreen';
@@ -9,7 +10,10 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Provider as PaperProvider } from 'react-native-paper';
+
+const queryClient = new QueryClient();
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -36,22 +40,25 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <PaperProvider>
-        <GlobalRefreshProvider>
+      <GlobalRefreshProvider>
+        <QueryClientProvider client={queryClient}>
           <ThemeProvider onReady={handleFontsReady}>
-            {!isAnimationComplete ? (
-              <SplashAnimationScreen onAnimationComplete={handleAnimationComplete} />
-            ) : (
-              <NotificationProvider>
-                <XPProvider>
-                  <RootNavigator />
-                  <StatusBar style="auto" />
-                </XPProvider>
-              </NotificationProvider>
-            )}
+            <PaperProvider>
+              {!isAnimationComplete ? (
+                <SplashAnimationScreen onAnimationComplete={handleAnimationComplete} />
+              ) : (
+                <NotificationProvider>
+                  <XPProvider>
+                    <RootNavigator />
+                    <BadgeInfoPopup />
+                    <StatusBar style="auto" />
+                  </XPProvider>
+                </NotificationProvider>
+              )}
+            </PaperProvider>
           </ThemeProvider>
-        </GlobalRefreshProvider>
-      </PaperProvider>
+        </QueryClientProvider>
+      </GlobalRefreshProvider>
     </GestureHandlerRootView>
   );
 }

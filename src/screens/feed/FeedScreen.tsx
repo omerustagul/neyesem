@@ -304,7 +304,7 @@ export const FeedScreen = () => {
                 onSave={() => setActiveSavePostId(item.id)}
                 onShare={() => { }}
                 isVisible={isVisible && isPageActive}
-                isMutedOverride={!!activeCommentPostId || !!activeSavePostId}
+                isMutedOverride={!!activeCommentPostId || !!activeSavePostId || viewerVisible}
                 isFollowing={isFollowing}
                 onToggleFollow={handleToggleFollow}
                 hasActiveStory={hasActiveStory}

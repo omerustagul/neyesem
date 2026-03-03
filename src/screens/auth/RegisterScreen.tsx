@@ -201,16 +201,16 @@ export const RegisterScreen = ({ navigation }: any) => {
             <Text style={[styles.stepDesc, { color: theme.secondaryText, fontFamily: typography.body }]}>Temel bilgilerinle başlayalım.</Text>
 
             <GlassCard style={styles.card}>
-                <Text style={styles.label}>KULLANICI ADI</Text>
-                <GlassInput value={username} onChangeText={t => setUsername(t.toLowerCase())} placeholder="neyesem_gurme" autoCapitalize="none" />
+                <Text style={styles.label}>Kullanıcı Adı</Text>
+                <GlassInput value={username} onChangeText={t => setUsername(t.toLowerCase())} placeholder="kullanıcı adı" autoCapitalize="none" />
 
-                <Text style={styles.label}>E-POSTA</Text>
-                <GlassInput value={email} onChangeText={setEmail} placeholder="ornek@email.com" keyboardType="email-address" autoCapitalize="none" />
+                <Text style={styles.label}>E-posta</Text>
+                <GlassInput value={email} onChangeText={setEmail} placeholder="e-posta adresi" keyboardType="email-address" autoCapitalize="none" />
 
-                <Text style={styles.label}>ŞİFRE</Text>
+                <Text style={styles.label}>Şifre</Text>
                 <GlassInput value={password} onChangeText={setPassword} placeholder="••••••" secureTextEntry />
 
-                <Text style={styles.label}>ŞİFRE TEKRAR</Text>
+                <Text style={styles.label}>Şifre Tekrar</Text>
                 <GlassInput value={confirmPassword} onChangeText={setConfirmPassword} placeholder="••••••" secureTextEntry />
 
                 <GlassButton title="İlerle" onPress={handleNext} loading={loading} style={{ marginTop: 24 }} trailingIcon={<ArrowRight size={18} color="#fff" />} />
@@ -228,10 +228,10 @@ export const RegisterScreen = ({ navigation }: any) => {
             </View>
 
             <GlassCard style={styles.card}>
-                <Text style={styles.label}>AD SOYAD</Text>
-                <GlassInput value={displayName} onChangeText={setDisplayName} placeholder="Halil İbrahim Ustagül" autoCapitalize="words" />
+                <Text style={styles.label}>Ad Soyad</Text>
+                <GlassInput value={displayName} onChangeText={setDisplayName} placeholder="Ad Soyad" autoCapitalize="words" />
 
-                <Text style={styles.label}>CİNSİYET</Text>
+                <Text style={styles.label}>Cinsiyet</Text>
                 <TouchableOpacity
                     style={[styles.selector, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: theme.border }]}
                     onPress={() => {
@@ -242,10 +242,10 @@ export const RegisterScreen = ({ navigation }: any) => {
                     <ChevronDown size={18} color={theme.secondaryText} />
                 </TouchableOpacity>
 
-                <Text style={styles.label}>ŞEHİR (İL)</Text>
+                <Text style={styles.label}>Şehir (İl)</Text>
                 <GlassInput value={city} onChangeText={setCity} placeholder="İstanbul" />
 
-                <Text style={styles.label}>DOĞUM TARİHİ</Text>
+                <Text style={styles.label}>Doğum Tarihi</Text>
                 <TouchableOpacity
                     style={[styles.selector, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: theme.border }]}
                     onPress={() => setShowDatePicker(true)}

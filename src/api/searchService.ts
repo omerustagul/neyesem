@@ -12,6 +12,9 @@ export interface UserProfile {
     following_count?: number;
     post_count?: number;
     level?: number;
+    xp?: number;
+    badges?: string[];
+    is_verified?: boolean;
 }
 
 export const searchUsers = async (searchTerm: string): Promise<UserProfile[]> => {

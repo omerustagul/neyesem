@@ -1,16 +1,19 @@
 import { useNavigation } from '@react-navigation/native';
 import { formatDistanceToNow as _formatDistanceToNow } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { Archive, ArrowLeft, Bell, CheckCircle, Heart, MessageCircle, Star, UserPlus } from 'lucide-react-native';
-import React, { useEffect } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { Archive, ArrowLeft, Bell, CheckCircle, Heart, MessageCircle, Star, UserCheck, UserPlus } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { followUser } from '../../api/followService';
-import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
+import { db } from '../../api/firebase';
+import { followUser, unfollowUser } from '../../api/followService';
+import { VerificationBadge } from '../../components/common/VerificationBadge';
+import { LevelBadge } from '../../components/level/LevelBadge';
 import { useAuthStore } from '../../store/authStore';
 import { AppNotification, useNotificationStore } from '../../store/notificationStore';
-import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeProvider';
 
 export const NotificationScreen = () => {
     const { theme, typography, isDark } = useTheme();
@@ -19,9 +22,24 @@ export const NotificationScreen = () => {
     const { notifications, setupListener, markAsRead } = useNotificationStore();
     const insets = useSafeAreaInsets();
 
+    // Track current user's following list for follow/unfollow toggle
+    const [following, setFollowing] = useState<string[]>([]);
+    const [followLoading, setFollowLoading] = useState<string | null>(null);
+
     useEffect(() => {
         if (!user) return;
         const unsubscribe = setupListener(user.uid);
+        return () => unsubscribe();
+    }, [user]);
+
+    // Subscribe to current user's following list
+    useEffect(() => {
+        if (!user) return;
+        const unsubscribe = onSnapshot(doc(db, 'profiles', user.uid), (snap) => {
+            if (snap.exists()) {
+                setFollowing(snap.data().following || []);
+            }
+        });
         return () => unsubscribe();
     }, [user]);
 
@@ -59,9 +77,28 @@ export const NotificationScreen = () => {
         });
     }, [notifications]);
 
+    const handleFollowToggle = async (targetUserId: string) => {
+        if (!user || followLoading !== null) return;
+        setFollowLoading(targetUserId);
+        try {
+            const isFollowing = following.includes(targetUserId);
+            if (isFollowing) {
+                await unfollowUser(user.uid, targetUserId);
+            } else {
+                await followUser(user.uid, targetUserId);
+            }
+        } catch { /* no-op */ } finally {
+            setFollowLoading(null);
+        }
+    };
+
     const renderNotificationItem = ({ item }: { item: AppNotification }) => {
         const isSystem = item.type === 'system' || !item.sender;
         const isFollow = item.type === 'follow';
+        const senderId = (item as any).sender_id ?? (item as any).sender?.uid ?? null;
+        const isAlreadyFollowing = senderId ? following.includes(senderId) : false;
+        const thumbnailUrl = (item as any).post_thumbnail_url || (item as any).thumbnail_url;
+        const pid = (item as any).postId ?? (item as any).post_id ?? null;
 
         return (
             <TouchableOpacity
@@ -76,12 +113,19 @@ export const NotificationScreen = () => {
                 onPress={async () => {
                     const notifId = (item as any).id || (item as any).notification_id;
                     await markAsRead(notifId);
-                    const pid = (item as any).postId ?? (item as any).post_id ?? null;
-                    const sid = (item as any).sender_id ?? null;
                     if (pid) {
-                        navigation.navigate('Reels', { initialPostId: pid } as any);
-                    } else if (sid) {
-                        navigation.navigate('PublicProfile', { userId: sid } as any);
+                        // For comment notifications, pass openComments and focusCommentId
+                        if (item.type === 'comment') {
+                            navigation.navigate('Reels', {
+                                initialPostId: pid,
+                                openComments: true,
+                                focusCommentId: (item as any).commentId || null,
+                            } as any);
+                        } else {
+                            navigation.navigate('Reels', { initialPostId: pid } as any);
+                        }
+                    } else if (senderId) {
+                        navigation.navigate('PublicProfile', { userId: senderId } as any);
                     }
                 }}
                 activeOpacity={0.8}
@@ -111,15 +155,18 @@ export const NotificationScreen = () => {
                     <View style={styles.mainSection}>
                         <View style={styles.textRow}>
                             {!isSystem && (
-                                <Text
-                                    style={[styles.username, { color: theme.text, fontFamily: typography.bodyMedium }]}
-                                    onPress={() => {
-                                        const sid = (item as any).sender_id ?? null
-                                        if (sid) navigation.navigate('PublicProfile', { userId: sid } as any)
-                                    }}
-                                >
-                                    {`@${item.sender?.username ?? ''}`}
-                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                                    <Text
+                                        style={[styles.username, { color: theme.text, fontFamily: typography.bodyMedium }]}
+                                        onPress={() => {
+                                            if (senderId) navigation.navigate('PublicProfile', { userId: senderId } as any)
+                                        }}
+                                    >
+                                        {`@${item.sender?.username ?? ''}`}
+                                    </Text>
+                                    {(item.sender?.is_verified || (item.sender?.level || 1) >= 10) && <VerificationBadge size={13} />}
+                                    {(item.sender?.level || 1) >= 5 && <LevelBadge level={item.sender?.level || 1} size={16} />}
+                                </View>
                             )}
                             <Text style={[styles.bodyText, { color: isSystem ? theme.text : theme.secondaryText, fontFamily: typography.body, fontSize: 13 }]}>
                                 {item.body}
@@ -130,29 +177,50 @@ export const NotificationScreen = () => {
                         </View>
                     </View>
 
-                    {isFollow && (
+                    {isFollow && senderId && (
                         <TouchableOpacity
-                            style={[styles.followBtn, { backgroundColor: colors.saffron }]}
-                            onPress={async () => {
-                                const targetUser = (item as any).sender_id ?? null
-                                if (targetUser && user?.uid) {
-                                    try { await followUser(user.uid, targetUser) } catch { /* no-op */ }
+                            style={[
+                                styles.followBtn,
+                                {
+                                    backgroundColor: isAlreadyFollowing
+                                        ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)')
+                                        : colors.saffron,
+                                    borderWidth: isAlreadyFollowing ? 1 : 0,
+                                    borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
                                 }
-                            }}
+                            ]}
+                            onPress={() => handleFollowToggle(senderId)}
+                            disabled={followLoading === senderId}
                         >
-                            <Text style={[styles.followBtnText, { fontFamily: typography.bodyMedium }]}>Takip Et</Text>
+                            {isAlreadyFollowing ? (
+                                <UserCheck size={13} color={theme.text} style={{ marginRight: 4 }} />
+                            ) : (
+                                <UserPlus size={13} color="#fff" style={{ marginRight: 4 }} />
+                            )}
+                            <Text style={[styles.followBtnText, {
+                                fontFamily: typography.bodyMedium,
+                                color: isAlreadyFollowing ? theme.text : '#fff',
+                            }]}>
+                                {isAlreadyFollowing ? 'Takipte' : 'Takip Et'}
+                            </Text>
                         </TouchableOpacity>
                     )}
 
-                    {/* Right thumbnail for post-related notifications */}
-                    {((item as any).postId ?? (item as any).post_id ?? (item as any).postThumbnail) ? (
-                        <VideoThumbnail
-                            videoUri={(item as any).content_url || ''}
-                            thumbnailUri={(item as any).post_thumbnail_url || (item as any).thumbnail_url}
+                    {/* Right thumbnail for post-related notifications (not follow) */}
+                    {!isFollow && thumbnailUrl ? (
+                        <Image
+                            source={{ uri: thumbnailUrl }}
                             style={styles.notificationThumb}
-                            showPlayIcon={false}
                         />
+                    ) : !isFollow && pid && !thumbnailUrl ? (
+                        // Placeholder only for comment notifications without thumbnail
+                        item.type === 'comment' ? (
+                            <View style={[styles.notificationThumb, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' }]}>
+                                <MessageCircle size={14} color={theme.secondaryText} />
+                            </View>
+                        ) : null
                     ) : null}
+
 
                     {!item.is_read && <View style={[styles.unreadDot, { backgroundColor: colors.saffron }]} />}
                 </View>
@@ -316,13 +384,14 @@ const styles = StyleSheet.create({
         opacity: 0.7,
     },
     followBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 10,
         marginLeft: 8,
     },
     followBtnText: {
-        color: '#fff',
         fontSize: 12,
     },
     unreadDot: {

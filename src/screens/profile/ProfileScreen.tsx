@@ -10,10 +10,13 @@ import { db } from '../../api/firebase';
 import { Post, subscribeToUserPosts } from '../../api/postService';
 import { Story, subscribeToActiveStories } from '../../api/storyService';
 import { SelectionOption, SelectionPopup } from '../../components/common/SelectionPopup';
+import { VerificationBadge } from '../../components/common/VerificationBadge';
 import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
 import { AnimatedLevelCard } from '../../components/level/AnimatedLevelCard';
+import { LevelBadge, getGoldUsernameColor } from '../../components/level/LevelBadge';
 import { FollowListPopup } from '../../components/social/FollowListPopup';
 import { StoryViewer } from '../../components/social/StoryViewer';
+import { useProfileBadges } from '../../hooks/useBadges';
 import { useAuthStore } from '../../store/authStore';
 import { useLevelStore } from '../../store/levelStore';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -37,6 +40,7 @@ export const ProfileScreen = () => {
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const insets = useSafeAreaInsets();
     const headerHeight = 52 + insets.top;
+    const profileBadges = useProfileBadges();
 
     const onRefresh = React.useCallback(() => {
         setIsRefreshing(true);
@@ -164,7 +168,22 @@ export const ProfileScreen = () => {
                     </View>
                 </TouchableOpacity>
 
-                <Text style={[styles.displayName, { color: theme.text, fontFamily: typography.display }]}>{profile?.display_name || profile?.displayName || 'Kullanıcı'}</Text>
+                <View style={styles.nameSection}>
+                    <Text style={[styles.displayName, {
+                        color: getGoldUsernameColor(level) || theme.text,
+                        fontFamily: typography.display,
+                    }]}>
+                        {profile?.display_name || profile?.displayName || 'Kullanıcı'}
+                    </Text>
+                    <View style={styles.badgeRow}>
+                        {(profile?.is_verified || level >= 10) && (
+                            <VerificationBadge size={18} />
+                        )}
+                        {level >= 5 && (
+                            <LevelBadge level={level} size={20} />
+                        )}
+                    </View>
+                </View>
                 <Text style={[styles.username, { color: theme.secondaryText, fontFamily: typography.body }]}>@{profile?.username || 'kullanici'}</Text>
 
                 <View style={[styles.statsRow, { borderColor: theme.border }]}>
@@ -184,7 +203,18 @@ export const ProfileScreen = () => {
 
                 <Text style={[styles.bio, { color: theme.secondaryText, fontFamily: typography.body }]}>{profile?.bio || 'Henüz biyografi eklenmedi.'}</Text>
 
-                <AnimatedLevelCard level={level} xp={xp} xpNext={xpNextLevel} levelName={levelName} streak={profile?.streak || 0} weeklyXp={profile?.weekly_xp || 0} />
+                <View style={{ marginHorizontal: -16 }}>
+                    <AnimatedLevelCard
+                        level={level}
+                        xp={xp}
+                        xpNext={xpNextLevel}
+                        levelName={levelName}
+                        streak={profile?.streak || 0}
+                        weeklyXp={profile?.weekly_xp || 0}
+                        rank={profile?.rank || (level * 987 % 1000) + 1}
+                        badges={profileBadges}
+                    />
+                </View>
 
                 <View style={styles.postsSection}>
                     <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.display }]}>Gönderiler</Text>
@@ -268,7 +298,20 @@ const styles = StyleSheet.create({
     avatarImage: { width: '100%', height: '100%', borderRadius: 44 },
     avatarFallback: { width: '100%', height: '100%', borderRadius: 44, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
     cameraBadge: { position: 'absolute', right: 0, bottom: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: colors.saffron, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-    displayName: { fontSize: 22, textAlign: 'center', marginBottom: 2 },
+    displayName: { fontSize: 24, textAlign: 'center' },
+    nameSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginBottom: 2,
+    },
+    badgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingTop: 4,
+    },
     username: { fontSize: 14, textAlign: 'center', marginBottom: 16 },
     statsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 10, marginBottom: 10 },
     statItem: { flex: 1, alignItems: 'center' },
@@ -280,6 +323,6 @@ const styles = StyleSheet.create({
     emptyState: { borderRadius: 20, padding: 32, alignItems: 'center', justifyContent: 'center' },
     emptyTitle: { fontSize: 16, marginTop: 8 },
     postsGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -2 },
-    gridItem: { width: GRID_ITEM_SIZE, aspectRatio: 0.75, padding: 2 },
+    gridItem: { width: GRID_ITEM_SIZE, aspectRatio: 0.6, padding: 4 },
     gridImage: { width: '100%', height: '100%', borderRadius: 12 },
 });

@@ -17,6 +17,11 @@ export interface Story {
     contentType: 'image' | 'video';
     text?: string;
     textColor?: string;
+    textX?: number;
+    textY?: number;
+    textScale?: number;
+    textRotation?: number;
+    textFontSize?: number;
     createdAt: any;
     expiresAt: any;
     viewedBy: string[];

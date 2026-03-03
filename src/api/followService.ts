@@ -1,4 +1,5 @@
 import { arrayRemove, arrayUnion, doc, getDoc, increment, writeBatch } from 'firebase/firestore';
+import { checkBadgesOnFollow } from './badgeService';
 import { db } from './firebase';
 import { createNotification } from './notificationService';
 
@@ -37,6 +38,9 @@ export const followUser = async (currentUserId: string, targetUserId: string) =>
                 `seni takip etmeye başladı.`
             );
         }
+
+        // Badge check — fire and forget
+        checkBadgesOnFollow(currentUserId).catch(() => { });
     } catch (error) {
         console.error('Error following user:', error);
         throw error;

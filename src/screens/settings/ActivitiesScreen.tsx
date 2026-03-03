@@ -130,7 +130,7 @@ export const ActivitiesScreen = () => {
                     <View style={styles.itemContent}>
                         {activeTab === 'comments' && item.content ? (
                             <>
-                                <Text style={[styles.itemComment, { color: theme.text, fontFamily: typography.body }]} numberOfLines={2}>
+                                <Text style={[styles.itemComment, { color: theme.text, fontFamily: typography.body }]} numberOfLines={1}>
                                     "{item.content}"
                                 </Text>
                                 <Text style={[styles.itemMeta, { color: theme.secondaryText, fontFamily: typography.body }]}>
@@ -139,7 +139,7 @@ export const ActivitiesScreen = () => {
                             </>
                         ) : (
                             <>
-                                <Text style={[styles.itemCaption, { color: theme.text, fontFamily: typography.body }]} numberOfLines={2}>
+                                <Text style={[styles.itemCaption, { color: theme.text, fontFamily: typography.body }]} numberOfLines={1}>
                                     {item.postCaption || 'Gönderi'}
                                 </Text>
                                 <Text style={[styles.itemMeta, { color: theme.secondaryText, fontFamily: typography.body }]}>
@@ -191,6 +191,7 @@ export const ActivitiesScreen = () => {
                                 {
                                     backgroundColor: isActive ? `${tab.color}15` : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
                                     borderColor: isActive ? tab.color : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'),
+                                    height: 40,
                                 }
                             ]}
                         >
@@ -283,20 +284,20 @@ const styles = StyleSheet.create({
     activityItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
-        borderRadius: 16,
+        padding: 8,
+        borderRadius: 12,
         borderWidth: 1,
-        gap: 12,
+        gap: 10,
     },
     itemImage: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
+        width: 36,
+        height: 36,
+        borderRadius: 8,
     },
     itemImagePlaceholder: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
+        width: 36,
+        height: 36,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -304,22 +305,22 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     itemCaption: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 13,
+        lineHeight: 18,
     },
     itemComment: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 13,
+        lineHeight: 18,
         fontStyle: 'italic',
     },
     itemMeta: {
-        fontSize: 11,
+        fontSize: 10,
         marginTop: 2,
     },
     itemIcon: {
-        width: 28,
-        height: 28,
-        borderRadius: 10,
+        width: 24,
+        height: 24,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
