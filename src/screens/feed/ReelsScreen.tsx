@@ -1,7 +1,8 @@
 import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Archive, ArrowLeft, Bookmark, ChefHat, Flag, Flame, Gauge, Heart, Info, Instagram, MessageCircle, MoreVertical, Music2, Pencil, Play, Timer, Trash2, User as UserIcon, UserMinus, Volume2, VolumeX } from 'lucide-react-native';
+import { Archive, ArrowLeft, Bookmark, ChefHat, Flag, Flame, Gauge, Heart, Info, Instagram, MessageCircle, MoreVertical, Music2, Pencil, Play, Share2, Timer, Trash2, User as UserIcon, UserMinus, Volume2, VolumeX } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, FlatList, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,8 +34,17 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
     const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
     const [showReadMoreButton, setShowReadMoreButton] = useState(false);
     const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+    const [isFoodExpanded, setIsFoodExpanded] = useState(false);
 
     const { embedHtml, nativeVideoUrl, platform, isLoading: isEmbedLoading } = useEmbed(post.content_url || '');
+
+    // Reset states when not active
+    useEffect(() => {
+        if (!isActive) {
+            setIsFoodExpanded(false);
+            setIsCaptionExpanded(false);
+        }
+    }, [isActive]);
 
     // Initialize expo-video player
     const isVideo = post.content_type === 'video' || (!post.content_type && post.content_url?.match(/\.(mp4|mov|m4v|m3u8)$|firebase-storage/i)) || !!nativeVideoUrl;
@@ -110,21 +120,205 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
         setShowOptionsMenu(true);
     };
 
-    const PlatformBadge = ({ platform }: { platform: string }) => {
-        if (platform === 'unknown') return null;
-        const isInstagram = platform === 'instagram';
-        return (
-            <View style={[styles.platformBadge, { backgroundColor: isInstagram ? '#E1306C40' : 'rgba(0,0,0,0.4)' }]}>
-                {isInstagram ? <Instagram size={10} color="#E1306C" /> : <Music2 size={10} color="#fff" />}
-                <Text style={[styles.platformText, { color: isInstagram ? '#E1306C' : '#fff' }]}>
-                    {isInstagram ? 'Instagram' : 'TikTok'}
-                </Text>
+    // Sub-components for better maintainability (Redesign implementation)
+    const TopBar = () => (
+        <View style={[topBarStyles.container, { top: insets.top + 8 }]}>
+            <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={topBarStyles.iconBtn}
+            >
+                <BlurView intensity={30} tint="dark" style={topBarStyles.blurBtn}>
+                    <ArrowLeft size={18} color="#fff" />
+                </BlurView>
+            </TouchableOpacity>
+
+            <View style={topBarStyles.rightGroup}>
+                <TouchableOpacity
+                    onPress={() => setIsMuted(!isMuted)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <BlurView intensity={30} tint="dark" style={topBarStyles.blurBtn}>
+                        {isMuted ? <VolumeX size={16} color="#fff" /> : <Volume2 size={16} color="#fff" />}
+                    </BlurView>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    onPress={handleMorePress}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <BlurView intensity={30} tint="dark" style={topBarStyles.blurBtn}>
+                        <MoreVertical size={16} color="#fff" />
+                    </BlurView>
+                </TouchableOpacity>
             </View>
-        );
-    };
+        </View>
+    );
+
+    const UserRow = () => (
+        <View style={userRowStyles.row}>
+            <TouchableOpacity
+                style={userRowStyles.userGroup}
+                onPress={() => navigation.navigate('PublicProfile', { userId: post.userId })}
+                activeOpacity={0.75}
+            >
+                <UserAvatar userId={post.userId} size={30} style={userRowStyles.avatar} />
+                <Text style={[userRowStyles.username, { fontFamily: typography.bodyMedium }]} numberOfLines={1}>
+                    {post.username}
+                </Text>
+            </TouchableOpacity>
+
+            {post.content_type === 'embed' && platform !== 'unknown' && (
+                <View style={[
+                    userRowStyles.platformChip,
+                    { backgroundColor: platform === 'instagram' ? 'rgba(225,48,108,0.2)' : 'rgba(0,0,0,0.3)' }
+                ]}
+                >
+                    {platform === 'instagram' ? <Instagram size={9} color="#E1306C" /> : <Music2 size={9} color="#fff" />}
+                    <Text style={[userRowStyles.platformText, { color: platform === 'instagram' ? '#E1306C' : '#fff' }]}>
+                        {platform === 'instagram' ? 'IG' : 'TT'}
+                    </Text>
+                </View>
+            )}
+
+            <View style={{ flex: 1 }} />
+
+            {!isOwner && (
+                <TouchableOpacity style={userRowStyles.followBtn} activeOpacity={0.8}>
+                    <Text style={userRowStyles.followText}>Takip</Text>
+                </TouchableOpacity>
+            )}
+        </View>
+    );
+
+    const CaptionRow = () => (
+        <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => showReadMoreButton && setIsCaptionExpanded(!isCaptionExpanded)}
+        >
+            <Text
+                style={[captionStyles.text, { fontFamily: typography.body }]}
+                numberOfLines={isCaptionExpanded ? undefined : 2}
+                onTextLayout={(e) => {
+                    if (e.nativeEvent.lines.length > 2 && !showReadMoreButton && !isCaptionExpanded) {
+                        setShowReadMoreButton(true);
+                    }
+                }}
+            >
+                {post.caption}
+            </Text>
+            {showReadMoreButton && !isCaptionExpanded && (
+                <Text style={captionStyles.readMore}>devamını gör</Text>
+            )}
+        </TouchableOpacity>
+    );
+
+    const FoodPill = () => (
+        <View>
+            <TouchableOpacity
+                style={foodStyles.pill}
+                onPress={() => setIsFoodExpanded(!isFoodExpanded)}
+                activeOpacity={0.8}
+            >
+                <View style={foodStyles.metrics}>
+                    {!!post.cooking_time && (
+                        <View style={foodStyles.metric}>
+                            <Timer size={11} color="rgba(255,255,255,0.7)" />
+                            <Text style={foodStyles.metricText}>{post.cooking_time}</Text>
+                        </View>
+                    )}
+                    {!!post.difficulty && (
+                        <View style={foodStyles.metric}>
+                            <Gauge size={11} color="rgba(255,255,255,0.7)" />
+                            <Text style={foodStyles.metricText}>{post.difficulty}</Text>
+                        </View>
+                    )}
+                    {!!post.calories && (
+                        <View style={foodStyles.metric}>
+                            <Flame size={11} color="rgba(255,255,255,0.7)" />
+                            <Text style={foodStyles.metricText}>{post.calories} kcal</Text>
+                        </View>
+                    )}
+                    {!!post.protein && (
+                        <View style={foodStyles.metric}>
+                            <ChefHat size={11} color="rgba(255,255,255,0.7)" />
+                            <Text style={foodStyles.metricText}>{post.protein}</Text>
+                        </View>
+                    )}
+                </View>
+
+                <View style={foodStyles.expandIcon}>
+                    <Info size={12} color={colors.saffron} />
+                </View>
+            </TouchableOpacity>
+
+            {isFoodExpanded && (
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={foodStyles.detailBtn}
+                    onPress={() => navigation.navigate('FoodDetail', { post: post })}
+                >
+                    <ChefHat size={14} color={colors.saffron} />
+                    <GradientText
+                        colors={[colors.saffron, colors.spiceRed]}
+                        style={foodStyles.detailBtnText}
+                        start={{ x: 0, y: 0.5 }}
+                        end={{ x: 1, y: 0.5 }}
+                    >
+                        Yemek Hakkında →
+                    </GradientText>
+                </TouchableOpacity>
+            )}
+        </View>
+    );
+
+    const ActionBar = () => (
+        <View style={actionStyles.bar}>
+            <TouchableOpacity
+                style={actionStyles.btn}
+                onPress={() => togglePostLike(post.id, user?.uid || '')}
+                activeOpacity={0.75}
+            >
+                <Heart size={18} color={isLiked ? colors.spiceRed : 'rgba(255,255,255,0.9)'} fill={isLiked ? colors.spiceRed : 'transparent'} />
+                <Text style={[actionStyles.count, isLiked && { color: colors.spiceRed }]}>{post.likes_count || 0}</Text>
+            </TouchableOpacity>
+
+            <View style={actionStyles.divider} />
+
+            <TouchableOpacity style={actionStyles.btn} onPress={onComment} activeOpacity={0.75}>
+                <MessageCircle size={18} color="rgba(255,255,255,0.9)" />
+                <Text style={actionStyles.count}>{post.comments_count || 0}</Text>
+            </TouchableOpacity>
+
+            <View style={actionStyles.divider} />
+
+            <TouchableOpacity style={actionStyles.btn} onPress={onSave} activeOpacity={0.75}>
+                <Bookmark size={18} color={isSaved ? colors.saffron : 'rgba(255,255,255,0.9)'} fill={isSaved ? colors.saffron : 'transparent'} />
+                <Text style={[actionStyles.count, isSaved && { color: colors.saffron }]}>{post.saves_count || 0}</Text>
+            </TouchableOpacity>
+
+            <View style={actionStyles.divider} />
+
+            <TouchableOpacity style={actionStyles.btn} onPress={handleShare} activeOpacity={0.75}>
+                <Share2 size={17} color="rgba(255,255,255,0.9)" />
+            </TouchableOpacity>
+        </View>
+    );
+
+    const BottomPanel = () => (
+        <View style={[panelStyles.container, { bottom: insets.bottom + 60 }]}>
+            <BlurView intensity={40} tint="dark" style={panelStyles.glassPanel}>
+                <UserRow />
+                {!!post.caption && <CaptionRow />}
+                {!!(post.cooking_time || post.difficulty || post.calories) && <FoodPill />}
+                <ActionBar />
+            </BlurView>
+        </View>
+    );
 
     return (
         <View style={styles.reelContainer}>
+            {/* Video layer */}
             <TouchableOpacity
                 activeOpacity={1}
                 style={StyleSheet.absoluteFill}
@@ -153,7 +347,6 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                                             width: 100vw; 
                                             overflow: hidden; 
                                           }
-                                          /* Hide non-media elements in embeds as much as possible */
                                           .instagram-media, .tiktok-embed { 
                                             margin: 0 !important; 
                                             padding: 0 !important; 
@@ -161,7 +354,6 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                                             min-width: 100% !important;
                                             max-width: 100% !important;
                                           }
-                                          /* Targeted CSS for Instagram/TikTok elements to focus on media */
                                           .EmbedHeader, .EmbedFooter, .UserTag, .SocialContext { display: none !important; }
                                         </style>
                                       </head>
@@ -192,6 +384,13 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                 )}
             </TouchableOpacity>
 
+            <LinearGradient
+                colors={['transparent', 'transparent', 'rgba(0,0,0,0.72)']}
+                locations={[0, 0.45, 1]}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+            />
+
             {!!(rate === 2.0) && (
                 <View style={styles.speedIndicator}>
                     <Text style={styles.speedText}>2x</Text>
@@ -200,166 +399,12 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
 
             {!!isPaused && (
                 <View style={styles.pauseOverlay}>
-                    <Play size={64} color="rgba(255,255,255,0.4)" fill="rgba(255,255,255,0.2)" />
+                    <Play size={56} color="rgba(255,255,255,0.35)" fill="rgba(255,255,255,0.15)" />
                 </View>
             )}
 
-            {/* Overlay Gradient/Shadow */}
-            <View style={styles.overlay}>
-                {/* Unified bottom bar: left info + right actions aligned */}
-                <View style={[styles.bottomBar, { bottom: insets.bottom + 70 }]}>
-                    {/* Left: Info section */}
-                    <View style={styles.bottomInfoCol}>
-                        {/* Food Info Section */}
-                        {!!(post.cooking_time || post.difficulty || post.calories || post.protein) && (
-                            <View style={{ marginBottom: 12 }}>
-                                <BlurView intensity={50} tint="dark" style={[styles.pillGlassSection, { backgroundColor: 'rgba(255, 178, 0, 0.15)', borderColor: 'rgba(255, 178, 0, 0.3)', paddingHorizontal: 12, paddingVertical: 10, alignSelf: 'stretch' }]}>
-                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 10 }}>
-                                        {!!post.cooking_time && (
-                                            <View style={styles.foodInfoItem}>
-                                                <Timer size={14} color="#fff" />
-                                                <Text style={styles.foodInfoText}>{post.cooking_time}</Text>
-                                            </View>
-                                        )}
-                                        {!!post.difficulty && (
-                                            <View style={styles.foodInfoItem}>
-                                                <Gauge size={14} color="#fff" />
-                                                <Text style={styles.foodInfoText}>{post.difficulty}</Text>
-                                            </View>
-                                        )}
-                                        {!!post.calories && (
-                                            <View style={styles.foodInfoItem}>
-                                                <Flame size={14} color="#fff" />
-                                                <Text style={styles.foodInfoText}>{post.calories} kcal</Text>
-                                            </View>
-                                        )}
-                                        {!!post.protein && (
-                                            <View style={styles.foodInfoItem}>
-                                                <ChefHat size={14} color="#fff" />
-                                                <Text style={styles.foodInfoText}>{post.protein}</Text>
-                                            </View>
-                                        )}
-                                    </View>
-
-                                    <TouchableOpacity
-                                        activeOpacity={0.8}
-                                        style={styles.foodDetailBtn}
-                                        onPress={() => navigation.navigate('FoodDetail', { post: post })}
-                                    >
-                                        <ChefHat size={16} color={colors.saffron} />
-                                        <GradientText
-                                            colors={[colors.saffron, colors.spiceRed]}
-                                            style={styles.foodDetailBtnText}
-                                            start={{ x: 0, y: 0.5 }}
-                                            end={{ x: 1, y: 0.5 }}
-                                        >
-                                            Yemek Hakkında
-                                        </GradientText>
-                                    </TouchableOpacity>
-                                </BlurView>
-                            </View>
-                        )}
-
-                        {post.content_type === 'embed' && (
-                            <BlurView intensity={25} tint="dark" style={[styles.pillGlassSection, { marginBottom: 8 }]}>
-                                <PlatformBadge platform={platform} />
-                            </BlurView>
-                        )}
-
-                        {/* User Section */}
-                        <BlurView intensity={30} tint="dark" style={[styles.pillGlassSection, { paddingVertical: 8, paddingHorizontal: 12 }]}>
-                            <View style={styles.userInfo}>
-                                <TouchableOpacity
-                                    style={{ flexDirection: 'row', alignItems: 'center' }}
-                                    onPress={() => navigation.navigate('PublicProfile', { userId: post.userId })}
-                                    activeOpacity={0.7}
-                                >
-                                    <UserAvatar
-                                        userId={post.userId}
-                                        size={36}
-                                        style={styles.avatar}
-                                    />
-                                    <Text style={[styles.username, { fontFamily: typography.bodyMedium, maxWidth: width * 0.45 }]}>{post.username}</Text>
-                                </TouchableOpacity>
-                                {!isOwner && (
-                                    <TouchableOpacity style={styles.followBtn}>
-                                        <Text style={styles.followText}>Takip Et</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </BlurView>
-
-                        {/* Caption Section */}
-                        {!!post.caption && (
-                            <TouchableOpacity
-                                activeOpacity={0.9}
-                                onPress={() => {
-                                    if (showReadMoreButton) {
-                                        setIsCaptionExpanded(!isCaptionExpanded);
-                                    }
-                                }}
-                                style={{ marginTop: 8 }}
-                            >
-                                <BlurView intensity={25} tint="dark" style={styles.pillGlassSection}>
-                                    <Text
-                                        style={[styles.caption, { fontFamily: typography.body, marginBottom: 0 }]}
-                                        numberOfLines={isCaptionExpanded ? undefined : 2}
-                                        onTextLayout={(e) => {
-                                            if (e.nativeEvent.lines.length > 2 && !showReadMoreButton && !isCaptionExpanded) {
-                                                setShowReadMoreButton(true);
-                                            }
-                                        }}
-                                    >
-                                        {post.caption}
-                                    </Text>
-                                    {showReadMoreButton && !isCaptionExpanded && (
-                                        <Text style={{ color: colors.saffron, marginTop: 4, fontSize: 13, fontFamily: typography.bodyMedium }}>
-                                            ... devamını gör
-                                        </Text>
-                                    )}
-                                </BlurView>
-                            </TouchableOpacity>
-                        )}
-                        {/* Music/Sound Section */}
-                        <TouchableOpacity style={{ marginTop: 8, alignSelf: 'flex-start' }} onPress={() => setIsMuted(!isMuted)}>
-                            <BlurView intensity={20} tint="light" style={[styles.pillGlassSection, { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12 }]}>
-                                {isMuted ? <VolumeX size={12} color="#fff" /> : <Volume2 size={12} color="#fff" />}
-                                <Text style={styles.musicText}>{isMuted ? 'Ses kapalı' : 'Orijinal Ses'}</Text>
-                            </BlurView>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Right: Action buttons */}
-                    <View style={styles.rightActionsCol}>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => togglePostLike(post.id, user?.uid || '')}>
-                            <BlurView intensity={25} tint="dark" style={styles.glassActionBtn}>
-                                <Heart size={24} color={isLiked ? colors.spiceRed : '#fff'} fill={isLiked ? colors.spiceRed : 'transparent'} />
-                            </BlurView>
-                            <Text style={styles.actionText}>{post.likes_count || 0}</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.actionBtn} onPress={onComment}>
-                            <BlurView intensity={25} tint="dark" style={styles.glassActionBtn}>
-                                <MessageCircle size={22} color="#fff" />
-                            </BlurView>
-                            <Text style={styles.actionText}>{post.comments_count || 0}</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.actionBtn} onPress={onSave}>
-                            <BlurView intensity={25} tint="dark" style={styles.glassActionBtn}>
-                                <Bookmark size={23} color={isSaved ? colors.saffron : '#fff'} fill={isSaved ? colors.saffron : 'transparent'} />
-                            </BlurView>
-                            <Text style={styles.actionText}>{post.saves_count || 0}</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.actionBtn} onPress={handleMorePress}>
-                            <BlurView intensity={25} tint="dark" style={styles.glassActionBtn}>
-                                <MoreVertical size={24} color="#fff" />
-                            </BlurView>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </View>
+            <TopBar />
+            <BottomPanel />
 
             <SelectionPopup
                 visible={showOptionsMenu}
@@ -468,7 +513,6 @@ export const ReelsScreen = () => {
                         flatListRef.current?.scrollToIndex({ index, animated: false });
                     }, 100);
 
-                    // Auto-open comments popup if navigated from comment notification
                     if (route.params?.openComments) {
                         setTimeout(() => {
                             setActiveCommentPostId(targetId);
@@ -525,16 +569,6 @@ export const ReelsScreen = () => {
                 />
             )}
 
-            {/* Back Button */}
-            <TouchableOpacity
-                style={[styles.backBtn, { top: insets.top + 10 }]}
-                onPress={() => navigation.goBack()}
-            >
-                <ArrowLeft size={28} color="#fff" />
-                <Text style={styles.reelsTitle}>Videolar</Text>
-            </TouchableOpacity>
-
-            {/* Popups */}
             {!!activeCommentPostId && (
                 <CommentsPopup
                     postId={activeCommentPostId}
@@ -556,6 +590,197 @@ export const ReelsScreen = () => {
     );
 };
 
+const topBarStyles = StyleSheet.create({
+    container: {
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        zIndex: 10,
+    },
+    rightGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    iconBtn: {
+        // Wrapper for hitSlop
+    },
+    blurBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+    },
+});
+
+const panelStyles = StyleSheet.create({
+    container: {
+        position: 'absolute',
+        left: 12,
+        right: 12,
+    },
+    glassPanel: {
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.10)',
+        paddingHorizontal: 14,
+        paddingTop: 12,
+        paddingBottom: 10,
+        gap: 8,
+        backgroundColor: 'rgba(20,18,14,0.55)',
+    },
+});
+
+const userRowStyles = StyleSheet.create({
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+    },
+    userGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+        flexShrink: 1,
+    },
+    avatar: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+    },
+    username: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600',
+        maxWidth: width * 0.38,
+    },
+    platformChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    platformText: {
+        fontSize: 9,
+        fontWeight: '700',
+    },
+    followBtn: {
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.5)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    followText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+});
+
+const captionStyles = StyleSheet.create({
+    text: {
+        color: 'rgba(255,255,255,0.88)',
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    readMore: {
+        color: colors.saffron,
+        fontSize: 12,
+        marginTop: 2,
+        fontWeight: '600',
+    },
+});
+
+const foodStyles = StyleSheet.create({
+    pill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(244,164,24,0.10)',
+        borderWidth: 1,
+        borderColor: 'rgba(244,164,24,0.20)',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    metrics: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flexWrap: 'wrap',
+    },
+    metric: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    metricText: {
+        color: 'rgba(255,255,255,0.80)',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    expandIcon: {
+        marginLeft: 8,
+    },
+    detailBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        marginTop: 6,
+        backgroundColor: 'rgba(244,164,24,0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(244,164,24,0.25)',
+        paddingVertical: 7,
+        borderRadius: 10,
+    },
+    detailBtnText: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+});
+
+const actionStyles = StyleSheet.create({
+    bar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 2,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.08)',
+        paddingTop: 8,
+    },
+    btn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+        paddingVertical: 4,
+    },
+    count: {
+        color: 'rgba(255,255,255,0.85)',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    divider: {
+        width: 1,
+        height: 16,
+        backgroundColor: 'rgba(255,255,255,0.10)',
+    },
+});
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -569,162 +794,6 @@ const styles = StyleSheet.create({
         width: width,
         height: height,
         position: 'absolute',
-    },
-    overlay: {
-        flex: 1,
-        justifyContent: 'flex-end',
-        paddingBottom: 40,
-        paddingHorizontal: 16,
-    },
-    rightActions: {
-        position: 'absolute',
-        right: 12,
-        bottom: 100,
-        alignItems: 'center',
-        gap: 20,
-    },
-    bottomBar: {
-        position: 'absolute',
-        left: 12,
-        right: 12,
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        gap: 8,
-    },
-    bottomInfoCol: {
-        flex: 1,
-        flexDirection: 'column',
-        justifyContent: 'flex-end',
-    },
-    rightActionsCol: {
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        gap: 20,
-        paddingBottom: 0,
-    },
-    actionBtn: {
-        alignItems: 'center',
-    },
-    actionText: {
-        color: '#fff',
-        fontSize: 12,
-        marginTop: 6,
-        fontWeight: '600',
-        textShadowColor: 'rgba(0,0,0,0.5)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
-    },
-    glassActionBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
-    },
-    pillGlassSection: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 20,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
-        backgroundColor: 'rgba(0,0,0,0.15)',
-        alignSelf: 'flex-start',
-    },
-    bottomInfo: {
-        width: '80%',
-    },
-    userInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 1,
-    },
-    avatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        marginRight: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-    },
-    avatarImage: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 16,
-    },
-    username: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: 'bold',
-        marginRight: 12,
-    },
-    followBtn: {
-        borderWidth: 1,
-        borderColor: '#fff',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 10,
-    },
-    followText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    caption: {
-        color: '#fff',
-        fontSize: 14,
-        marginBottom: 12,
-    },
-    musicContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    musicText: {
-        color: '#fff',
-        fontSize: 12,
-    },
-    backBtn: {
-        position: 'absolute',
-        left: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    reelsTitle: {
-        color: '#fff',
-        fontSize: 20,
-        fontWeight: 'bold',
-    },
-    foodInfoItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    foodDetailBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        backgroundColor: 'rgba(255, 178, 0, 0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 178, 0, 0.3)',
-        paddingVertical: 8,
-        borderRadius: 12,
-    },
-    foodDetailBtnText: {
-        color: colors.saffron,
-        fontSize: 13,
-        fontWeight: 'bold',
-    },
-    foodInfoText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: '600',
     },
     speedIndicator: {
         position: 'absolute',
@@ -745,19 +814,5 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         pointerEvents: 'none',
-    },
-    platformBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 8,
-        gap: 6,
-        alignSelf: 'flex-start',
-        marginBottom: 8,
-    },
-    platformText: {
-        fontSize: 10,
-        fontWeight: '700',
     },
 });
