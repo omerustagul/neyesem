@@ -6,7 +6,7 @@ import { sha1 } from 'js-sha1';
 import { ArrowRight, BookOpen, Camera, Link, Lock, Minus, Plus, Sparkles, Video, X } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useEffect, useState } from 'react';
-import { Alert, Dimensions, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../../api/firebase';
 import { createPost, type FoodCategory } from '../../api/postService';
@@ -241,12 +241,13 @@ export const CreateScreen = ({ navigation }: any) => {
                 protein,
                 thumbnailUrl,
                 tags,
-                [],
+                recipeIngredients.filter(i => i.name.trim()).map(i => `${i.quantity} ${i.name}`.trim()),
                 undefined,
                 undefined,
                 undefined,
                 foodCategory || undefined,
-                customHashtags
+                customHashtags,
+                recipeDescription.split('\n').filter(step => step.trim())
             );
 
             // Reward XP
@@ -524,7 +525,14 @@ export const CreateScreen = ({ navigation }: any) => {
                             ))}
 
                             <TouchableOpacity
-                                onPress={() => setRecipeIngredients([...recipeIngredients, { name: '', quantity: '' }])}
+                                onPress={() => {
+                                    const lastIng = recipeIngredients[recipeIngredients.length - 1];
+                                    if (lastIng && !lastIng.name.trim()) {
+                                        Alert.alert('Bilgi', 'Yeni satır eklemeden önce mevcut malzemeyi doldurmalısınız.');
+                                        return;
+                                    }
+                                    setRecipeIngredients([...recipeIngredients, { name: '', quantity: '' }]);
+                                }}
                                 style={[styles.addIngBtn, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}
                             >
                                 <Plus size={16} color={colors.saffron} />
@@ -535,7 +543,14 @@ export const CreateScreen = ({ navigation }: any) => {
                                 title="İleri"
                                 style={{ marginTop: 24 }}
                                 trailingIcon={<ArrowRight size={20} color={colors.warmWhite} />}
-                                onPress={() => setStep('post_details')}
+                                onPress={() => {
+                                    // Remove empty rows before proceeding
+                                    const cleaned = recipeIngredients.filter(ing => ing.name.trim());
+                                    if (cleaned.length > 0) {
+                                        setRecipeIngredients(cleaned);
+                                    }
+                                    setStep('post_details');
+                                }}
                             />
                         </GlassCard>
                     </MotiView>
@@ -659,7 +674,7 @@ export const CreateScreen = ({ navigation }: any) => {
                                         <View style={styles.aiIconBox}><Text style={{ fontSize: 20 }}>⚖️</Text></View>
                                         <View>
                                             <Text style={styles.aiResultLabel}>PROTEİN</Text>
-                                            <Text style={[styles.aiResultValue, { color: theme.warmWhite }]}>{protein}</Text>
+                                            <Text style={[styles.aiResultValue, { color: theme.text }]}>{protein}</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -743,16 +758,22 @@ export const CreateScreen = ({ navigation }: any) => {
                     <View style={{ width: 36 }} />
                 </View>
 
-                <ScrollView
-                    contentContainerStyle={styles.formContent}
-                    bounces={true}
-                    alwaysBounceVertical={Platform.OS === 'ios'}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    style={{ flex: 1 }}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + -50 : 0}
                 >
-                    {renderProgressBar()}
-                    {renderStepContent()}
-                </ScrollView>
+                    <ScrollView
+                        contentContainerStyle={styles.formContent}
+                        bounces={true}
+                        alwaysBounceVertical={Platform.OS === 'ios'}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        {renderProgressBar()}
+                        {renderStepContent()}
+                    </ScrollView>
+                </KeyboardAvoidingView>
             </View>
         );
     }

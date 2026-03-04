@@ -127,7 +127,6 @@ export const VideoPostCard: React.FC<VideoPostCardProps> = ({
                 }
             }
             viewStartTime.current = null;
-            hasViewedRef.current = false; // Reset for next time they scroll away and back
         }
 
         return () => {

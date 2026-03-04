@@ -4,7 +4,7 @@ import { db } from '../api/firebase';
 
 export type NotificationType =
     | 'like' | 'comment' | 'follow' | 'follow_request'
-    | 'save' | 'mention' | 'level_up' | 'reward' | 'xp_gained' | 'system' | 'list' | 'archive';
+    | 'save' | 'mention' | 'level_up' | 'reward' | 'xp_gained' | 'system' | 'list' | 'archive' | 'badge_earned';
 
 export interface AppNotification {
     id: string;
@@ -28,6 +28,7 @@ export interface AppNotification {
     post_thumbnail_url?: string;
     thumbnail_url?: string;
     commentId?: string;
+    badgeId?: string;
 }
 
 interface NotificationState {

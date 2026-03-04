@@ -2,7 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formatDistanceToNow as _formatDistanceToNow } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { Archive, ArrowLeft, Bell, CheckCircle, Heart, MessageCircle, Star, UserCheck, UserPlus } from 'lucide-react-native';
+import { Archive, ArrowLeft, Bell, CheckCircle, Heart, MessageCircle, Star, Trophy, UserCheck, UserPlus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { followUser, unfollowUser } from '../../api/followService';
 import { VerificationBadge } from '../../components/common/VerificationBadge';
 import { LevelBadge } from '../../components/level/LevelBadge';
 import { useAuthStore } from '../../store/authStore';
+import { useNavigationStore } from '../../store/navigationStore';
 import { AppNotification, useNotificationStore } from '../../store/notificationStore';
 import { colors } from '../../theme/colors';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -20,6 +21,7 @@ export const NotificationScreen = () => {
     const navigation: any = useNavigation();
     const { user } = useAuthStore();
     const { notifications, setupListener, markAsRead } = useNotificationStore();
+    const { setActiveTab } = useNavigationStore();
     const insets = useSafeAreaInsets();
 
     // Track current user's following list for follow/unfollow toggle
@@ -47,6 +49,7 @@ export const NotificationScreen = () => {
         switch (type) {
             case 'like': return <Heart size={12} color={colors.spiceRed} fill={colors.spiceRed} />;
             case 'comment': return <MessageCircle size={12} color={theme.text} />;
+            case 'badge_earned': return <Trophy size={12} color={colors.saffron} />;
             case 'follow': return <UserPlus size={12} color="#3b82f6" />;
             case 'system': return <Bell size={12} color={colors.saffron} />;
             case 'archive': return <Archive size={12} color={theme.secondaryText} />;
@@ -124,6 +127,12 @@ export const NotificationScreen = () => {
                         } else {
                             navigation.navigate('Reels', { initialPostId: pid } as any);
                         }
+                    } else if (item.type === 'badge_earned' && item.badgeId) {
+                        setActiveTab('Profile');
+                        navigation.navigate('Main', {
+                            openBadges: true,
+                            highlightBadgeId: item.badgeId
+                        } as any);
                     } else if (senderId) {
                         navigation.navigate('PublicProfile', { userId: senderId } as any);
                     }
@@ -132,7 +141,7 @@ export const NotificationScreen = () => {
             >
                 <View style={styles.contentRow}>
                     <View style={styles.leftSection}>
-                        {isSystem ? (
+                        {isSystem && item.type !== 'badge_earned' ? (
                             <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(20,133,74,0.15)' : 'rgba(20,133,74,0.08)' }]}>
                                 {getIcon(item.type)}
                             </View>
@@ -159,7 +168,15 @@ export const NotificationScreen = () => {
                                     <Text
                                         style={[styles.username, { color: theme.text, fontFamily: typography.bodyMedium }]}
                                         onPress={() => {
-                                            if (senderId) navigation.navigate('PublicProfile', { userId: senderId } as any)
+                                            if (item.type === 'badge_earned' && item.badgeId) {
+                                                setActiveTab('Profile');
+                                                navigation.navigate('Main', {
+                                                    openBadges: true,
+                                                    highlightBadgeId: item.badgeId
+                                                });
+                                            } else if (senderId) {
+                                                navigation.navigate('PublicProfile', { userId: senderId } as any);
+                                            }
                                         }}
                                     >
                                         {`@${item.sender?.username ?? ''}`}

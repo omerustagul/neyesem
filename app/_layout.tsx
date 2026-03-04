@@ -1,4 +1,5 @@
 import { BadgeInfoPopup } from '@/src/components/common/BadgeInfoPopup';
+import { LevelUpSheet } from '@/src/components/level/LevelUpSheet';
 import { GlobalRefreshProvider } from '@/src/context/GlobalRefreshContext';
 import { NotificationProvider } from '@/src/context/NotificationContext';
 import { XPProvider } from '@/src/context/XPContext';
@@ -51,6 +52,7 @@ export default function RootLayout() {
                   <XPProvider>
                     <RootNavigator />
                     <BadgeInfoPopup />
+                    <LevelUpSheet />
                     <StatusBar style="auto" />
                   </XPProvider>
                 </NotificationProvider>

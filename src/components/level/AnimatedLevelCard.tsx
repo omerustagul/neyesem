@@ -1,7 +1,6 @@
 import {
     Award,
     ShieldCheck,
-    Star,
     TrendingUp,
     Trophy,
     Zap
@@ -17,6 +16,7 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { ProfileBadge } from '../../hooks/useBadges';
+import { LEVEL_COLORS } from '../../store/levelStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { colors } from '../../theme/colors';
 import { GlassCard } from '../glass/GlassCard';
@@ -24,55 +24,6 @@ import { AbilitiesPopup } from './AbilitiesPopup';
 import { BadgesPopup } from './BadgesPopup';
 import { LeaderboardPopup } from './LeaderboardPopup';
 import { XPBar } from './XPBar';
-
-const LEVEL_DATA = [
-    { level: 1, name: 'Düz Yiyici', xpRequired: 0, perks: ['Keşfet Erişimi', 'Profil Oluşturma'], tier: 'Çırak' },
-    { level: 2, name: 'Kaşıkçı', xpRequired: 150, perks: ['Tariflere Yorum Yapma', 'Beğeni Gönderme'], tier: 'Çırak' },
-    { level: 3, name: 'Ev Aşçısı', xpRequired: 400, perks: ['Kendi Listelerini Oluştur', 'Favoriler'], tier: 'Çırak' },
-    { level: 4, name: 'Usta Çırak', xpRequired: 800, perks: ['Görüntülü Tarif Paylaşma', 'Yorumlarda Görsel'], tier: 'Çırak' },
-    { level: 5, name: 'Sous Chef', xpRequired: 1500, perks: ['Hikaye Paylaşma', 'Profil Rozeti'], tier: 'Usta' },
-    { level: 6, name: 'Şef', xpRequired: 3000, perks: ['Özel Şef Rozeti', 'Mesajlaşma'], tier: 'Usta' },
-    { level: 7, name: 'Baş Şef', xpRequired: 5000, perks: ['Çırak Eğitim Yetkisi', 'Öncelikli Keşfet'], tier: 'Usta' },
-    { level: 8, name: 'Gastronom', xpRequired: 8000, perks: ['Özel Profil Temaları', 'Gelişmiş Analitik'], tier: 'Usta' },
-    { level: 9, name: 'Gurme', xpRequired: 12000, perks: ['Usta Onaylı Rozet', 'Beta Özellikler'], tier: 'Usta' },
-    { level: 10, name: 'Altın Çatal', xpRequired: 20000, perks: ['Neyesem Elçilik Statüsü', 'Altın Kullanıcı Adı'], tier: 'Efsane' },
-];
-
-const PERK_ICONS: Record<string, React.ComponentType<any>> = {
-    'Keşfet Erişimi': Star,
-    'Profil Oluşturma': Star,
-    'Tariflere Yorum Yapma': Star,
-    'Beğeni Gönderme': Star,
-    'Kendi Listelerini Oluştur': Star,
-    'Favoriler': Star,
-    'Görüntülü Tarif Paylaşma': Star,
-    'Yorumlarda Görsel': Star,
-    'Hikaye Paylaşma': Star,
-    'Profil Rozeti': ShieldCheck,
-    'Özel Şef Rozeti': Award,
-    'Mesajlaşma': Star,
-    'Çırak Eğitim Yetkisi': Star,
-    'Öncelikli Keşfet': Zap,
-    'Özel Profil Temaları': Star,
-    'Gelişmiş Analitik': Star,
-    'Usta Onaylı Rozet': ShieldCheck,
-    'Beta Özellikler': Star,
-    'Neyesem Elçilik Statüsü': Trophy,
-    'Altın Kullanıcı Adı': Star,
-};
-
-const LEVEL_COLORS: Record<number, { primary: string; secondary: string; light: string }> = {
-    1: { primary: '#94a3b8', secondary: '#64748b', light: 'rgba(148,163,184,0.1)' },
-    2: { primary: '#d97706', secondary: '#92400e', light: 'rgba(217,119,6,0.1)' },
-    3: { primary: '#94a3b8', secondary: '#475569', light: 'rgba(148,163,184,0.15)' },
-    4: { primary: '#fbbf24', secondary: '#b45309', light: 'rgba(251,191,36,0.15)' },
-    5: { primary: '#2dd4bf', secondary: '#0f766e', light: 'rgba(45,212,191,0.15)' },
-    6: { primary: '#10b981', secondary: '#047857', light: 'rgba(16,185,129,0.15)' },
-    7: { primary: '#3b82f6', secondary: '#1d4ed8', light: 'rgba(59,130,246,0.15)' },
-    8: { primary: '#8b5cf6', secondary: '#6d28d9', light: 'rgba(139,92,246,0.15)' },
-    9: { primary: '#ef4444', secondary: '#b91c1c', light: 'rgba(239,68,68,0.15)' },
-    10: { primary: '#f59e0b', secondary: '#d97706', light: 'rgba(245,158,11,0.2)' },
-};
 
 interface AnimatedLevelCardProps {
     level: number;
@@ -84,6 +35,8 @@ interface AnimatedLevelCardProps {
     mini?: boolean;
     rank?: number;
     badges?: ProfileBadge[];
+    initialShowBadges?: boolean;
+    highlightBadgeId?: string;
 }
 
 export const AnimatedLevelCard: React.FC<AnimatedLevelCardProps> = ({
@@ -96,11 +49,19 @@ export const AnimatedLevelCard: React.FC<AnimatedLevelCardProps> = ({
     mini = false,
     rank = 0,
     badges = [],
+    initialShowBadges = false,
+    highlightBadgeId,
 }) => {
     const { theme, typography } = useTheme();
     const [showLeaderboard, setShowLeaderboard] = useState(false);
     const [showAbilities, setShowAbilities] = useState(false);
-    const [showBadges, setShowBadges] = useState(false);
+    const [showBadges, setShowBadges] = useState(initialShowBadges);
+
+    React.useEffect(() => {
+        if (initialShowBadges) {
+            setShowBadges(true);
+        }
+    }, [initialShowBadges]);
 
     const badgeScale = useSharedValue(1);
     const auraScale = useSharedValue(1);
@@ -236,10 +197,13 @@ export const AnimatedLevelCard: React.FC<AnimatedLevelCardProps> = ({
                 visible={showAbilities}
                 onClose={() => setShowAbilities(false)}
                 level={level}
-                perks={LEVEL_DATA.find(l => l.level === level)?.perks || []}
-                perkIcons={PERK_ICONS}
             />
-            <BadgesPopup visible={showBadges} onClose={() => setShowBadges(false)} badges={badges} />
+            <BadgesPopup
+                visible={showBadges}
+                onClose={() => setShowBadges(false)}
+                badges={badges}
+                highlightBadgeId={highlightBadgeId}
+            />
         </>
     );
 };

@@ -1,4 +1,4 @@
-﻿import { useNavigation } from '@react-navigation/native';
+﻿import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useRef, useState } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 import {
@@ -33,7 +33,16 @@ export const TabNavigator = () => {
     const scrollPosition = useSharedValue(0);
     const pagerRef = useRef<PagerView>(null);
     const [activeIndex, setActiveIndex] = useState(0);
-    const { setActiveTab } = useNavigationStore();
+    const { activeTab, setActiveTab } = useNavigationStore();
+
+    // Sync PagerView with store (for external tab changes like Notifications -> Profile)
+    React.useEffect(() => {
+        const targetIndex = ROUTE_MAP[activeTab];
+        if (targetIndex !== undefined && targetIndex !== activeIndex) {
+            pagerRef.current?.setPage(targetIndex);
+            setActiveIndex(targetIndex);
+        }
+    }, [activeTab]);
 
     // Simplified navigation state for 5 tabs
     const navigationState = {
@@ -76,6 +85,9 @@ export const TabNavigator = () => {
         }
     };
 
+    const route = useRoute<any>();
+    const params = route.params || {};
+
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <GlobalHeader />
@@ -100,7 +112,10 @@ export const TabNavigator = () => {
                     <ListsScreen />
                 </View>
                 <View key="4" style={styles.page}>
-                    <ProfileScreen />
+                    <ProfileScreen
+                        initialShowBadges={params.openBadges}
+                        highlightBadgeId={params.highlightBadgeId}
+                    />
                 </View>
             </PagerView>
 

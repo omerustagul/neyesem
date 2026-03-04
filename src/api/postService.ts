@@ -59,7 +59,8 @@ export const createPost = async (
     parentPostId?: string,
     isChainRoot?: boolean,
     foodCategory?: FoodCategory,
-    hashtags: string[] = []
+    hashtags: string[] = [],
+    recipe_steps: string[] = []
 ): Promise<string> => {
     try {
         const postData = {
@@ -82,6 +83,7 @@ export const createPost = async (
             isChainRoot: isChainRoot || false,
             foodCategory: foodCategory || null,
             hashtags,
+            recipe_steps,
             likes_count: 0,
             comments_count: 0,
             shares_count: 0,
@@ -472,10 +474,22 @@ export const incrementShareCount = async (postId: string): Promise<void> => {
 // Archive post
 export const archivePost = async (postId: string): Promise<void> => {
     try {
-        await updateDoc(doc(db, 'posts', postId), {
-            is_archived: true,
-            updated_at: serverTimestamp(),
-        });
+        const postRef = doc(db, 'posts', postId);
+        const postSnap = await getDoc(postRef);
+
+        if (postSnap.exists()) {
+            const postData = postSnap.data() as Post;
+            await updateDoc(postRef, {
+                is_archived: true,
+                updated_at: serverTimestamp(),
+            });
+
+            // Decrement profile post count
+            const profileRef = doc(db, 'profiles', postData.userId);
+            await updateDoc(profileRef, {
+                post_count: increment(-1)
+            });
+        }
     } catch (error) {
         console.error('Error archiving post:', error);
         throw error;
@@ -485,10 +499,22 @@ export const archivePost = async (postId: string): Promise<void> => {
 // Unarchive post
 export const unarchivePost = async (postId: string): Promise<void> => {
     try {
-        await updateDoc(doc(db, 'posts', postId), {
-            is_archived: false,
-            updated_at: serverTimestamp(),
-        });
+        const postRef = doc(db, 'posts', postId);
+        const postSnap = await getDoc(postRef);
+
+        if (postSnap.exists()) {
+            const postData = postSnap.data() as Post;
+            await updateDoc(postRef, {
+                is_archived: false,
+                updated_at: serverTimestamp(),
+            });
+
+            // Increment profile post count
+            const profileRef = doc(db, 'profiles', postData.userId);
+            await updateDoc(profileRef, {
+                post_count: increment(1)
+            });
+        }
     } catch (error) {
         console.error('Error unarchiving post:', error);
         throw error;
@@ -527,23 +553,6 @@ export const deletePost = async (postId: string, userId: string): Promise<void> 
 };
 // Removed duplicate import; using existing top-level import from firebase/firestore
 // db import is defined at the top
-
-// Archive a post and decrement the owner's post_count
-export const archivePostForUser = async (userId: string, postId: string) => {
-    try {
-        const postRef = doc(db, 'posts', postId);
-        await updateDoc(postRef, { archived: true });
-        const profileRef = doc(db, 'profiles', userId);
-        const snap = await getDoc(profileRef);
-        if (snap.exists()) {
-            const current = snap.data().post_count ?? 0;
-            const next = Math.max(0, current - 1);
-            await updateDoc(profileRef, { post_count: next });
-        }
-    } catch (e) {
-        console.error('Failed to archive post and update count', e);
-    }
-};
 
 // Save a post for a user (increment saved list/count)
 export const savePostForUser = async (userId: string, postId: string) => {
@@ -597,28 +606,28 @@ export const recordPostView = async (postId: string, userId: string): Promise<vo
 
         const viewSnap = await getDoc(viewRef);
         if (viewSnap.exists()) {
-            // User saw it again, increment their personal count and last seen
+            // User saw it again, update last seen but DON'T increment global view count
             await updateDoc(viewRef, {
-                view_count: increment(1),
                 last_viewed_at: serverTimestamp(),
+                internal_view_count: increment(1), // Keep track of repeats internally for analytics
             });
         } else {
-            // Fast time viewing
+            // First time unique view for this user
             const { setDoc } = await import('firebase/firestore');
             await setDoc(viewRef, {
                 postId,
                 userId,
-                view_count: 1,
+                view_count: 1, // Unique views
                 first_viewed_at: serverTimestamp(),
                 last_viewed_at: serverTimestamp(),
             });
-        }
 
-        // 2. Increment the global view count on the post
-        const postRef = doc(db, 'posts', postId);
-        await updateDoc(postRef, {
-            views: increment(1)
-        });
+            // 2. Increment the global view count on the post ONLY for unique views
+            const postRef = doc(db, 'posts', postId);
+            await updateDoc(postRef, {
+                views: increment(1)
+            });
+        }
 
     } catch (error) {
         // Fail silently so it doesn't interrupt the user experience

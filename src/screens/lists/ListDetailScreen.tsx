@@ -22,6 +22,7 @@ import {
     Alert,
     Dimensions,
     FlatList,
+    Image,
     Share,
     StyleSheet,
     Text,
@@ -150,14 +151,28 @@ export const ListDetailScreen = ({ route, navigation }: any) => {
                     showPlayIcon={true}
                     views={item.views || 0}
                 />
-                <View style={styles.postInfo}>
-                    <Text style={[styles.postTitle, { color: '#fff', fontFamily: typography.bodyMedium }]} numberOfLines={1}>
-                        {item.display_name || item.username}
+                {/* Sol üst köşe: küçük avatar + kullanıcı adı */}
+                <View style={styles.postUserRow}>
+                    {item.avatar_url ? (
+                        <Image
+                            source={{ uri: item.avatar_url }}
+                            style={styles.postAvatar}
+                        />
+                    ) : (
+                        <View style={styles.postAvatarFallback}>
+                            <Text style={styles.postAvatarInitial}>
+                                {(item.username || item.display_name || '?')[0].toUpperCase()}
+                            </Text>
+                        </View>
+                    )}
+                    <Text style={[styles.postUsername, { fontFamily: typography.bodyMedium }]} numberOfLines={1}>
+                        @{item.username || item.display_name}
                     </Text>
                 </View>
             </TouchableOpacity>
         </MotiView>
     );
+
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -272,21 +287,42 @@ const styles = StyleSheet.create({
         height: '100%',
         opacity: 0.8,
     },
-    postOverlay: {
-        ...StyleSheet.absoluteFillObject,
+    postUserRow: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        borderRadius: 20,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        maxWidth: '80%',
+    },
+    postAvatar: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.4)',
+    },
+    postAvatarFallback: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.2)',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(0,0,0,0.2)',
     },
-    postInfo: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: 10,
-        backgroundColor: 'rgba(0,0,0,0.4)',
+    postAvatarInitial: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: '700',
     },
-    postTitle: {
-        fontSize: 12,
+    postUsername: {
+        color: '#fff',
+        fontSize: 10,
+        flexShrink: 1,
     },
 });

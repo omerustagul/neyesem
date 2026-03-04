@@ -190,7 +190,7 @@ export const FeedScreen = () => {
         const unsubProfile = onSnapshot(doc(db, 'profiles', user.uid), (snap) => {
             if (snap.exists()) {
                 const data = snap.data();
-                updateStats({ level: data.level || 1, xp: data.xp || 0, xp_next_level: data.xp_next_level || 150 });
+                updateStats(user.uid, { level: data.level || 1, xp: data.xp || 0, xp_next_level: data.xp_next_level || 150 });
                 setFollowingList(data.following || []);
             }
         });

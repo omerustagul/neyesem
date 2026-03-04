@@ -15,19 +15,21 @@ import { useTheme } from '../theme/ThemeProvider';
 import { colors } from '../theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const TAB_BAR_WIDTH = SCREEN_WIDTH - 40;
-const TAB_CONTENT_WIDTH = TAB_BAR_WIDTH - 24;
+const TAB_BAR_MARGIN = 18;
+const TAB_BAR_PADDING = 6;
+const TAB_BAR_WIDTH = SCREEN_WIDTH - (TAB_BAR_MARGIN * 2);
+const TAB_CONTENT_WIDTH = TAB_BAR_WIDTH - (TAB_BAR_PADDING * 2);
 const TAB_WIDTH = TAB_CONTENT_WIDTH / 5;
 
 const SPRING_CONFIG = { damping: 20, stiffness: 250, mass: 0.8 };
 
 // Estimated initial positions to avoid indicator flickering or disappearing
 const INITIAL_POSITIONS = [
-    12 + TAB_WIDTH * 0.5 - 3,
-    12 + TAB_WIDTH * 1.5 - 3,
-    12 + TAB_WIDTH * 2.5 - 3,
-    12 + TAB_WIDTH * 3.5 - 3,
-    12 + TAB_WIDTH * 4.5 - 3,
+    TAB_BAR_PADDING + TAB_WIDTH * 0.5 - 3,
+    TAB_BAR_PADDING + TAB_WIDTH * 1.5 - 3,
+    TAB_BAR_PADDING + TAB_WIDTH * 2.5 - 3,
+    TAB_BAR_PADDING + TAB_WIDTH * 3.5 - 3,
+    TAB_BAR_PADDING + TAB_WIDTH * 4.5 - 3,
 ];
 
 interface CustomTabBarProps extends BottomTabBarProps {
@@ -166,8 +168,8 @@ const styles = StyleSheet.create({
     container: {
         position: 'absolute',
         bottom: 18,
-        left: 12,
-        right: 12,
+        left: 18,
+        right: 18,
         alignItems: 'center',
     },
     tabBar: {
@@ -177,7 +179,7 @@ const styles = StyleSheet.create({
     },
     backgroundContainer: {
         ...StyleSheet.absoluteFillObject,
-        borderRadius: 28,
+        borderRadius: 24,
         borderWidth: 1,
         overflow: 'hidden',
         shadowColor: '#0A6C40',
@@ -189,7 +191,7 @@ const styles = StyleSheet.create({
     tabContent: {
         flexDirection: 'row',
         height: '100%',
-        paddingHorizontal: 12,
+        paddingHorizontal: 6,
         alignItems: 'center',
         justifyContent: 'space-between',
         width: '100%',

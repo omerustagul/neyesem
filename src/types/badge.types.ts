@@ -15,17 +15,20 @@ export type BadgeGroup =
 
 export type Badge = {
     id: BadgeId;
-    emoji: string;
+    emoji: string;          // Kept for legacy — not rendered in UI
+    icon: string;           // lucide-react-native icon name
+    iconColor: string;      // Primary accent color for the icon
+    iconBg: string;         // Background color (rgba) for the badge frame
     name: string;
-    title: string;         // Rozet başlığı — profilde italik gösterilir
-    description: string;   // Koşul açıklaması
+    title: string;          // Rozet başlığı — profilde italik gösterilir
+    description: string;    // Koşul açıklaması
     group: BadgeGroup;
     xpReward: number;
-    isSecret: boolean;     // true ise kazanılana kadar görünmez
+    isSecret: boolean;      // true ise kazanılana kadar görünmez
 };
 
 export type UserBadge = {
     badgeId: BadgeId;
-    earnedAt: string;     // ISO string
-    postId?: string;      // Rozeti kazandıran gönderi (varsa)
+    earnedAt: string;       // ISO string
+    postId?: string;        // Rozeti kazandıran gönderi (varsa)
 };

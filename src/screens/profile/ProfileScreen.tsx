@@ -1,4 +1,5 @@
-import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
@@ -6,10 +7,11 @@ import { Camera, Eye, Settings, User as UserIcon } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { runRetroactiveBadgeCheck } from '../../api/badgeService';
 import { db } from '../../api/firebase';
 import { Post, subscribeToUserPosts } from '../../api/postService';
 import { Story, subscribeToActiveStories } from '../../api/storyService';
-import { SelectionOption, SelectionPopup } from '../../components/common/SelectionPopup';
+import { SelectionPopup } from '../../components/common/SelectionPopup';
 import { VerificationBadge } from '../../components/common/VerificationBadge';
 import { VideoThumbnail } from '../../components/feed/VideoThumbnail';
 import { AnimatedLevelCard } from '../../components/level/AnimatedLevelCard';
@@ -25,10 +27,12 @@ import { colors } from '../../theme/colors';
 const { width } = Dimensions.get('window');
 const GRID_ITEM_SIZE = (width - 32) / 3;
 
-export const ProfileScreen = () => {
+
+export const ProfileScreen = ({ initialShowBadges, highlightBadgeId }: { initialShowBadges?: boolean, highlightBadgeId?: string }) => {
     const { theme, isDark, typography } = useTheme();
     const { user } = useAuthStore();
     const navigation = useNavigation<any>();
+    const route = useRoute<any>();
     const { level, xp, xpNextLevel, levelName, updateStats } = useLevelStore();
     const [profile, setProfile] = useState<any>(null);
     const [userPosts, setUserPosts] = useState<Post[]>([]);
@@ -57,7 +61,7 @@ export const ProfileScreen = () => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     setProfile(data);
-                    updateStats({
+                    updateStats(user.uid, {
                         level: data.level || 1,
                         xp: data.xp || 0,
                         xp_next_level: data.xp_next_level || 100,
@@ -81,15 +85,31 @@ export const ProfileScreen = () => {
             setActiveStories(stories);
         });
 
-
+        // Retroactive badge check — runs only once per user ever
+        AsyncStorage.getItem(`@retro_badge_done_${user.uid}`).then(done => {
+            if (!done) {
+                runRetroactiveBadgeCheck(user.uid).then(() => {
+                    AsyncStorage.setItem(`@retro_badge_done_${user.uid}`, '1');
+                }).catch(() => { });
+            }
+        });
 
         return () => {
             unsubscribe();
             postsUnsubscribe();
             storiesUnsubscribe();
-
         };
     }, [user, updateStats]);
+
+    // Self-healing post count synchronizer
+    useEffect(() => {
+        if (user && profile && userPosts.length !== undefined && profile.post_count !== userPosts.length) {
+            console.log(`Self-healing post count for ${user.uid}: ${profile.post_count} -> ${userPosts.length}`);
+            updateDoc(doc(db, 'profiles', user.uid), {
+                post_count: userPosts.length
+            }).catch(console.error);
+        }
+    }, [userPosts.length, profile?.post_count]);
 
     const handlePickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -116,7 +136,7 @@ export const ProfileScreen = () => {
         }
     };
 
-    const posts = profile?.post_count || 0;
+    const posts = userPosts.length;
     const followers = profile?.followers_count || 0;
     const following = profile?.following_count || 0;
 
@@ -213,6 +233,8 @@ export const ProfileScreen = () => {
                         weeklyXp={profile?.weekly_xp || 0}
                         rank={profile?.rank || (level * 987 % 1000) + 1}
                         badges={profileBadges}
+                        initialShowBadges={route.params?.openBadges || false}
+                        highlightBadgeId={route.params?.highlightBadgeId}
                     />
                 </View>
 
@@ -257,34 +279,51 @@ export const ProfileScreen = () => {
 
             <StoryViewer visible={viewerVisible} stories={activeStories} onClose={() => setViewerVisible(false)} />
 
-            <SelectionPopup
-                visible={showProfileMenu}
-                title="Profil Fotoğrafı"
-                onClose={() => setShowProfileMenu(false)}
-                options={[
-                    ...(activeStories.length > 0 ? [{
-                        label: 'Hikayeyi İzle',
-                        icon: <Eye size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
-                        onPress: () => {
-                            setShowProfileMenu(false);
-                            setViewerVisible(true);
+            {showProfileMenu && (
+                <SelectionPopup
+                    title="Profil Seçenekleri"
+                    visible={showProfileMenu}
+                    onClose={() => setShowProfileMenu(false)}
+                    options={[
+                        ...(activeStories.length > 0 ? [{
+                            label: 'Hikayeyi İzle',
+                            icon: <Eye size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                            onPress: () => {
+                                setShowProfileMenu(false);
+                                setViewerVisible(true);
+                            }
+                        }] : []),
+                        {
+                            label: 'Fotoğrafı Değiştir',
+                            icon: <Camera size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
+                            onPress: () => {
+                                setShowProfileMenu(false);
+                                handlePickImage();
+                            }
+                        },
+                        {
+                            label: 'Bilgileri Düzenle',
+                            onPress: () => {
+                                setShowProfileMenu(false);
+                                Alert.alert('Bilgi', 'Profil düzenleme yakında eklenecek.');
+                            },
+                        },
+                        {
+                            label: 'Çıkış Yap',
+                            onPress: () => {
+                                setShowProfileMenu(false);
+                                useAuthStore.getState().signOut();
+                            },
+                            type: 'destructive',
+                        },
+                        {
+                            label: 'İptal',
+                            type: 'cancel',
+                            onPress: () => setShowProfileMenu(false)
                         }
-                    }] : []),
-                    {
-                        label: 'Fotoğrafı Değiştir',
-                        icon: <Camera size={18} color={isDark ? '#F5F5F5' : '#1A1A1A'} />,
-                        onPress: () => {
-                            setShowProfileMenu(false);
-                            handlePickImage();
-                        }
-                    },
-                    {
-                        label: 'İptal',
-                        type: 'cancel',
-                        onPress: () => setShowProfileMenu(false)
-                    }
-                ] as SelectionOption[]}
-            />
+                    ]}
+                />
+            )}
         </View>
     );
 };

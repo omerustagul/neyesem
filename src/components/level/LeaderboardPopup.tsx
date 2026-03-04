@@ -84,15 +84,23 @@ export const LeaderboardPopup: React.FC<LeaderboardPopupProps> = ({ visible, onC
 
     const renderBackground = useCallback(() => (
         <View style={StyleSheet.absoluteFill}>
-            <BlurView
-                intensity={isDark ? 50 : 80}
-                tint={isDark ? 'dark' : 'light'}
+            <View style={[StyleSheet.absoluteFill, { borderRadius: 32, overflow: 'hidden' }]}>
+                <BlurView
+                    intensity={isDark ? 50 : 80}
+                    tint={isDark ? 'dark' : 'light'}
+                    style={[
+                        StyleSheet.absoluteFill,
+                        {
+                            backgroundColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.7)',
+                        }
+                    ]}
+                />
+            </View>
+            <View
                 style={[
                     StyleSheet.absoluteFill,
                     {
-                        backgroundColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.7)',
-                        borderRadius: 30,
-                        overflow: 'hidden',
+                        borderRadius: 32,
                         borderWidth: 1.5,
                         borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
                     }
@@ -282,7 +290,7 @@ export const LeaderboardPopup: React.FC<LeaderboardPopupProps> = ({ visible, onC
                     <View style={styles.header}>
                         <Trophy size={28} color={colors.saffron} style={{ marginBottom: 8 }} />
                         <Text style={[styles.title, { color: theme.text, fontFamily: typography.display }]}>
-                            LİDERLİK TABLOSU
+                            Liderlik Tablosu
                         </Text>
                     </View>
 
