@@ -5,6 +5,7 @@ export const MOOD_MODES: MoodMode[] = [
         id: 'mac_gecesi',
         name: 'Maç Gecesi',
         emoji: '⚽',
+        icon: 'Gamepad2',
         description: 'Eller bulaşmadan, paylaşımlık atıştırmalıklar',
         gradient: ['#C0513A', '#8B2500'],
         vector: {
@@ -27,6 +28,7 @@ export const MOOD_MODES: MoodMode[] = [
         id: 'gece_yarisi',
         name: 'Gece Yarısı Açlığı',
         emoji: '🌙',
+        icon: 'Moon',
         description: 'Gece yarısı gelen o tatlı veya tuzlu krizleri',
         gradient: ['#1A1A1D', '#4E4E50'],
         vector: {
@@ -48,6 +50,7 @@ export const MOOD_MODES: MoodMode[] = [
         id: 'aci_meydan_okuma',
         name: 'Acıya Meydan Okuma',
         emoji: '🌶️',
+        icon: 'Flame',
         description: 'Ağızları yoran ama vazgeçilmeyen acı lezzetler',
         gradient: ['#FF0000', '#B22222'],
         vector: {
@@ -66,6 +69,7 @@ export const MOOD_MODES: MoodMode[] = [
         id: 'film_gecesi',
         name: 'Film Gecesi',
         emoji: '🍿',
+        icon: 'Popcorn',
         description: 'Ekran başında keyifle atıştırılacaklar',
         gradient: ['#F9D423', '#FF4E50'],
         vector: {
@@ -87,6 +91,7 @@ export const MOOD_MODES: MoodMode[] = [
         id: 'hasta_yatagi',
         name: 'Hasta Yatağında',
         emoji: '🍵',
+        icon: 'HeartPulse',
         description: 'İyileştiren, şifa veren sıcacık tarifler',
         gradient: ['#DAE2F8', '#D6A4A4'],
         vector: {
@@ -105,6 +110,7 @@ export const MOOD_MODES: MoodMode[] = [
         id: 'pazar_keyfi',
         name: 'Pazar Keyfi',
         emoji: '☀️',
+        icon: 'Sun',
         description: 'Mangal, sofra hazırlığı, bolca vakit',
         gradient: ['#F4A418', '#C0513A'],
         vector: {
@@ -127,6 +133,7 @@ export const MOOD_MODES: MoodMode[] = [
         id: 'romantik_aksam',
         name: 'Romantik Akşam',
         emoji: '🕯️',
+        icon: 'Heart',
         description: 'İkili sofra, özenli sunum, şık tarifler',
         gradient: ['#8B2563', '#C0513A'],
         vector: {
@@ -149,6 +156,7 @@ export const MOOD_MODES: MoodMode[] = [
         id: 'saglikli_yasam',
         name: 'Sağlıklı Yaşam',
         emoji: '🥗',
+        icon: 'Salad',
         description: 'Hafif, besleyici, dengeli tarifler',
         gradient: ['#3B4A2F', '#8FA67A'],
         vector: {

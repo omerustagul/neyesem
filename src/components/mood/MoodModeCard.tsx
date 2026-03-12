@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { Flame, Gamepad2, Heart, HeartPulse, Moon, Popcorn, Salad, Sun } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
     useAnimatedStyle,
@@ -7,6 +8,18 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '../../theme/ThemeProvider';
 import { MoodMode } from '../../types/mood.types';
+
+// Icon mapping
+const ICON_MAP: Record<string, any> = {
+    Gamepad2,
+    Moon,
+    Flame,
+    Popcorn,
+    HeartPulse,
+    Sun,
+    Heart,
+    Salad,
+};
 
 type Props = {
     mode: MoodMode;
@@ -37,6 +50,9 @@ export default function MoodModeCard({ mode, isSelected, onPress }: Props) {
         onPress();
     };
 
+    // Get icon component dynamically
+    const IconComponent = mode.icon ? ICON_MAP[mode.icon] : null;
+
     return (
         <Animated.View style={[styles.wrapper, animStyle]}>
             {/* Seçili glow efekti */}
@@ -64,8 +80,18 @@ export default function MoodModeCard({ mode, isSelected, onPress }: Props) {
                         }
                     ]}
                 >
-                    {/* Emoji */}
-                    <Text style={styles.emoji}>{mode.emoji}</Text>
+                    {/* Icon or Emoji */}
+                    {IconComponent ? (
+                        <View style={styles.iconContainer}>
+                            <IconComponent 
+                                size={32} 
+                                color={isSelected ? '#fff' : mode.gradient[0]} 
+                                strokeWidth={2}
+                            />
+                        </View>
+                    ) : (
+                        <Text style={styles.emoji}>{mode.emoji}</Text>
+                    )}
 
                     {/* İsim */}
                     <Text style={[
@@ -117,6 +143,9 @@ const styles = StyleSheet.create({
     },
     emoji: {
         fontSize: 28,
+        marginBottom: 8,
+    },
+    iconContainer: {
         marginBottom: 8,
     },
     name: {

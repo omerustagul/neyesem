@@ -75,28 +75,29 @@ export default function CuisineCard({ cuisine, isSelected, onPress }: Props) {
 
 const styles = StyleSheet.create({
     wrapper: {
-        width: 120,
-        marginRight: 10,
+        width: 130,
+        marginRight: 12,
     },
     card: {
         borderRadius: 20,
-        padding: 12,
+        padding: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: 110,
+        height: 130,
+        width: 130,
     },
     iconWrap: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8,
+        marginBottom: 10,
     },
     name: {
         fontSize: 13,
         textAlign: 'center',
-        marginBottom: 2,
+        marginBottom: 4,
     },
     count: {
         fontSize: 10,

@@ -55,6 +55,7 @@ export type MoodMode = {
     id: string;
     name: string;
     emoji: string;
+    icon?: string;  // Lucide icon name
     description: string;
     gradient: [string, string];   // Kart gradyan renkleri
     vector: MoodVector;

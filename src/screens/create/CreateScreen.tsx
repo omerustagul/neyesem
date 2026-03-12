@@ -41,9 +41,18 @@ export const CreateScreen = ({ navigation }: any) => {
     // New Post Meta State
     const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
     const [cookingTime, setCookingTime] = useState('15dk');
+    const [prepTime, setPrepTime] = useState('10dk');
     const [difficulty, setDifficulty] = useState('Orta');
+    const [servings, setServings] = useState('4');
     const [calories, setCalories] = useState(0);
     const [protein, setProtein] = useState('');
+    const [carbs, setCarbs] = useState('');
+    const [fat, setFat] = useState('');
+    const [fiber, setFiber] = useState('');
+    const [allergens, setAllergens] = useState<string[]>([]);
+    const [allergenInput, setAllergenInput] = useState('');
+    const [tips, setTips] = useState<string[]>([]);
+    const [tipInput, setTipInput] = useState('');
     const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
     const [foodCategory, setFoodCategory] = useState<FoodCategory | null>(null);
     const [hashtagInput, setHashtagInput] = useState('');
@@ -236,12 +245,19 @@ export const CreateScreen = ({ navigation }: any) => {
                 contentType,
                 contentUrl,
                 cookingTime,
+                prepTime,
                 difficulty,
+                servings,
                 calories,
                 protein,
+                carbs,
+                fat,
+                fiber,
                 thumbnailUrl,
                 tags,
                 recipeIngredients.filter(i => i.name.trim()).map(i => `${i.quantity} ${i.name}`.trim()),
+                allergens,
+                tips,
                 undefined,
                 undefined,
                 undefined,
@@ -283,9 +299,18 @@ export const CreateScreen = ({ navigation }: any) => {
         setPostUrl('');
         setSelectedMedia(null);
         setCookingTime('15dk');
+        setPrepTime('10dk');
         setDifficulty('Orta');
+        setServings('4');
         setCalories(0);
         setProtein('');
+        setCarbs('');
+        setFat('');
+        setFiber('');
+        setAllergens([]);
+        setAllergenInput('');
+        setTips([]);
+        setTipInput('');
         setFoodCategory(null);
         setHashtagInput('');
         setCustomHashtags([]);
@@ -560,10 +585,11 @@ export const CreateScreen = ({ navigation }: any) => {
                 return (
                     <MotiView from={{ opacity: 0, translateX: 50 }} animate={{ opacity: 1, translateX: 0 }} transition={{ type: 'timing' }}>
                         <Text style={[styles.stepTitle, { color: theme.text, fontFamily: typography.display }]}>Tarif Detayları</Text>
-                        <Text style={[styles.stepDesc, { color: theme.secondaryText, fontFamily: typography.body }]}>Hazırlama süresi ve zorluk seviyesini belirt.</Text>
+                        <Text style={[styles.stepDesc, { color: theme.secondaryText, fontFamily: typography.body }]}>Hazırlama süresi, besin değerleri ve daha fazla bilgi ekle.</Text>
 
                         <GlassCard>
-                            <Text style={styles.miniLabel}>HAZIRLAMA SÜRESİ</Text>
+                            {/* Cooking & Prep Times */}
+                            <Text style={styles.miniLabel}>PİŞİRME SÜRESİ</Text>
                             <View style={styles.chipRow}>
                                 {['15dk', '30dk', '45dk', '60dk+'].map(time => (
                                     <TouchableOpacity
@@ -576,7 +602,32 @@ export const CreateScreen = ({ navigation }: any) => {
                                 ))}
                             </View>
 
-                            <Text style={[styles.miniLabel, { marginTop: 24 }]}>ZORLUK SEVİYESİ</Text>
+                            <Text style={[styles.miniLabel, { marginTop: 16 }]}>HAZIRLAMA SÜRESİ</Text>
+                            <View style={styles.chipRow}>
+                                {['5dk', '10dk', '15dk', '20dk+'].map(time => (
+                                    <TouchableOpacity
+                                        key={time}
+                                        style={[styles.chip, prepTime === time && { backgroundColor: colors.mintFresh, borderColor: colors.mintFresh }]}
+                                        onPress={() => setPrepTime(time)}
+                                    >
+                                        <Text style={[styles.chipText, { color: prepTime === time ? '#fff' : theme.text }]}>{time}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            {/* Servings */}
+                            <Text style={[styles.miniLabel, { marginTop: 16 }]}>PORSIYON SAYISI</Text>
+                            <TextInput
+                                style={[styles.smallInput, { color: theme.text, borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', fontFamily: typography.body }]}
+                                placeholder="4"
+                                placeholderTextColor={theme.secondaryText}
+                                value={servings}
+                                onChangeText={setServings}
+                                keyboardType="number-pad"
+                            />
+
+                            {/* Difficulty */}
+                            <Text style={[styles.miniLabel, { marginTop: 16 }]}>ZORLUK SEVİYESİ</Text>
                             <View style={styles.chipRow}>
                                 {['Kolay', 'Orta', 'Zor'].map(diff => (
                                     <TouchableOpacity
@@ -589,6 +640,122 @@ export const CreateScreen = ({ navigation }: any) => {
                                 ))}
                             </View>
 
+                            {/* Nutrition Values */}
+                            <Text style={[styles.miniLabel, { marginTop: 24 }]}>BESIN DEĞERLERİ (100g)</Text>
+                            <View style={styles.nutritionInputRow}>
+                                <TextInput
+                                    style={[styles.nutritionInput, { color: theme.text, borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', fontFamily: typography.body }]}
+                                    placeholder="Kalori"
+                                    placeholderTextColor={theme.secondaryText}
+                                    value={String(calories)}
+                                    onChangeText={(v) => setCalories(parseInt(v) || 0)}
+                                    keyboardType="number-pad"
+                                />
+                                <TextInput
+                                    style={[styles.nutritionInput, { color: theme.text, borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', fontFamily: typography.body }]}
+                                    placeholder="Protein"
+                                    placeholderTextColor={theme.secondaryText}
+                                    value={protein}
+                                    onChangeText={setProtein}
+                                />
+                            </View>
+                            <View style={styles.nutritionInputRow}>
+                                <TextInput
+                                    style={[styles.nutritionInput, { color: theme.text, borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', fontFamily: typography.body }]}
+                                    placeholder="Karbohidrat"
+                                    placeholderTextColor={theme.secondaryText}
+                                    value={carbs}
+                                    onChangeText={setCarbs}
+                                />
+                                <TextInput
+                                    style={[styles.nutritionInput, { color: theme.text, borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', fontFamily: typography.body }]}
+                                    placeholder="Yağ"
+                                    placeholderTextColor={theme.secondaryText}
+                                    value={fat}
+                                    onChangeText={setFat}
+                                />
+                            </View>
+                            <TextInput
+                                style={[styles.smallInput, { color: theme.text, borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', fontFamily: typography.body }]}
+                                placeholder="Lif"
+                                placeholderTextColor={theme.secondaryText}
+                                value={fiber}
+                                onChangeText={setFiber}
+                            />
+
+                            {/* Allergens */}
+                            <Text style={[styles.miniLabel, { marginTop: 24 }]}>ALERJENLER</Text>
+                            <View style={[styles.hashtagInput, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}>
+                                <TextInput
+                                    style={[styles.hashtagInputField, { color: theme.text, fontFamily: typography.body }]}
+                                    placeholder="Fındık, Süt, Gluten..."
+                                    placeholderTextColor={theme.secondaryText}
+                                    value={allergenInput}
+                                    onChangeText={setAllergenInput}
+                                    onSubmitEditing={() => {
+                                        if (allergenInput.trim() && !allergens.includes(allergenInput.trim())) {
+                                            setAllergens([...allergens, allergenInput.trim()]);
+                                            setAllergenInput('');
+                                        }
+                                    }}
+                                />
+                                <TouchableOpacity onPress={() => {
+                                    if (allergenInput.trim() && !allergens.includes(allergenInput.trim())) {
+                                        setAllergens([...allergens, allergenInput.trim()]);
+                                        setAllergenInput('');
+                                    }
+                                }} style={[styles.hashtagAddBtn, { backgroundColor: colors.spiceRed }]}>
+                                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>+</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.hashtagList}>
+                                {allergens.map((allergen, idx) => (
+                                    <View key={idx} style={[styles.hashtagTag, { backgroundColor: `${colors.spiceRed}20`, borderColor: colors.spiceRed }]}>
+                                        <Text style={[styles.hashtagTagText, { color: colors.spiceRed }]}>{allergen}</Text>
+                                        <TouchableOpacity onPress={() => setAllergens(allergens.filter((_, i) => i !== idx))}>
+                                            <Text style={[styles.hashtagRemove, { color: colors.spiceRed }]}>×</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                            </View>
+
+                            {/* Tips */}
+                            <Text style={[styles.miniLabel, { marginTop: 24 }]}>İPUÇLARI</Text>
+                            <View style={[styles.hashtagInput, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}>
+                                <TextInput
+                                    style={[styles.hashtagInputField, { color: theme.text, fontFamily: typography.body }]}
+                                    placeholder="Faydalı bir ipucu ekle..."
+                                    placeholderTextColor={theme.secondaryText}
+                                    value={tipInput}
+                                    onChangeText={setTipInput}
+                                    onSubmitEditing={() => {
+                                        if (tipInput.trim() && !tips.includes(tipInput.trim())) {
+                                            setTips([...tips, tipInput.trim()]);
+                                            setTipInput('');
+                                        }
+                                    }}
+                                />
+                                <TouchableOpacity onPress={() => {
+                                    if (tipInput.trim() && !tips.includes(tipInput.trim())) {
+                                        setTips([...tips, tipInput.trim()]);
+                                        setTipInput('');
+                                    }
+                                }} style={[styles.hashtagAddBtn, { backgroundColor: colors.oliveLight }]}>
+                                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>+</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.hashtagList}>
+                                {tips.map((tip, idx) => (
+                                    <View key={idx} style={[styles.hashtagTag, { backgroundColor: `${colors.oliveLight}20`, borderColor: colors.oliveLight }]}>
+                                        <Text style={[styles.hashtagTagText, { color: colors.oliveLight }]}>{tip}</Text>
+                                        <TouchableOpacity onPress={() => setTips(tips.filter((_, i) => i !== idx))}>
+                                            <Text style={[styles.hashtagRemove, { color: colors.oliveLight }]}>×</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                            </View>
+
+                            {/* Food Category */}
                             <Text style={[styles.miniLabel, { marginTop: 24 }]}>YİYECEK KATEGORİSİ</Text>
                             <View style={styles.chipRow}>
                                 {(['meal', 'dessert', 'snack', 'beverage', 'breakfast', 'appetizer'] as FoodCategory[]).map(cat => (
@@ -604,6 +771,7 @@ export const CreateScreen = ({ navigation }: any) => {
                                 ))}
                             </View>
 
+                            {/* Hashtags */}
                             <Text style={[styles.miniLabel, { marginTop: 24 }]}>HASHTAG'LER</Text>
                             <View style={styles.hashtagContainer}>
                                 <View style={[styles.hashtagInput, { borderColor: theme.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}>
@@ -1148,6 +1316,50 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 13,
         lineHeight: 18,
+    },
+    smallInput: {
+        height: 44,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        fontSize: 14,
+        marginBottom: 12,
+    },
+    nutritionInputRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 12,
+    },
+    nutritionInput: {
+        flex: 1,
+        height: 44,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        fontSize: 14,
+    },
+    captionInput: {
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        fontSize: 14,
+        marginBottom: 16,
+        textAlignVertical: 'top',
+    },
+    formHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 16,
+    },
+    formHeaderTitle: {
+        fontSize: 18,
+    },
+    formContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 40,
     },
 });
 

@@ -20,12 +20,13 @@ import { colors } from '../../theme/colors';
 
 const { width, height } = Dimensions.get('window');
 
-const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, onArchive, isPopupOpen }: { post: Post; isActive: boolean; onComment: () => void; onSave: () => void; isScreenFocused: boolean; onEdit: () => void; onArchive: () => void; isPopupOpen: boolean }) => {
+const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, onArchive, isPopupOpen, optimisticIsLiked, onLike }: { post: Post; isActive: boolean; onComment: () => void; onSave: () => void; isScreenFocused: boolean; onEdit: () => void; onArchive: () => void; isPopupOpen: boolean; optimisticIsLiked?: boolean; onLike: () => void }) => {
     const { theme, isDark, typography } = useTheme();
     const { user } = useAuthStore();
     const navigation = useNavigation<any>();
     const insets = useSafeAreaInsets();
-    const isLiked = post.liked_by?.includes(user?.uid || '');
+    const actualIsLiked = post.liked_by?.includes(user?.uid || '');
+    const isLiked = optimisticIsLiked !== undefined ? optimisticIsLiked : actualIsLiked;
     const isSaved = post.saved_by?.includes(user?.uid || '');
     const isOwner = user?.uid === post.userId;
     const [isPaused, setIsPaused] = useState(false);
@@ -128,9 +129,11 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 style={topBarStyles.iconBtn}
             >
-                <BlurView intensity={30} tint="dark" style={topBarStyles.blurBtn}>
-                    <ArrowLeft size={18} color="#fff" />
-                </BlurView>
+                <View style={topBarStyles.btnBorder}>
+                    <BlurView intensity={40} tint="dark" style={topBarStyles.blurBtn}>
+                        <ArrowLeft size={24} color="#fff" />
+                    </BlurView>
+                </View>
             </TouchableOpacity>
 
             <View style={topBarStyles.rightGroup}>
@@ -138,18 +141,22 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
                     onPress={() => setIsMuted(!isMuted)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                    <BlurView intensity={30} tint="dark" style={topBarStyles.blurBtn}>
-                        {isMuted ? <VolumeX size={16} color="#fff" /> : <Volume2 size={16} color="#fff" />}
-                    </BlurView>
+                    <View style={topBarStyles.btnBorder}>
+                        <BlurView intensity={40} tint="dark" style={topBarStyles.blurBtn}>
+                            {isMuted ? <VolumeX size={20} color="#fff" /> : <Volume2 size={20} color="#fff" />}
+                        </BlurView>
+                    </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     onPress={handleMorePress}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                    <BlurView intensity={30} tint="dark" style={topBarStyles.blurBtn}>
-                        <MoreVertical size={16} color="#fff" />
-                    </BlurView>
+                    <View style={topBarStyles.btnBorder}>
+                        <BlurView intensity={40} tint="dark" style={topBarStyles.blurBtn}>
+                            <MoreVertical size={20} color="#fff" />
+                        </BlurView>
+                    </View>
                 </TouchableOpacity>
             </View>
         </View>
@@ -276,7 +283,7 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
         <View style={actionStyles.bar}>
             <TouchableOpacity
                 style={actionStyles.btn}
-                onPress={() => togglePostLike(post.id, user?.uid || '')}
+                onPress={onLike}
                 activeOpacity={0.75}
             >
                 <Heart size={18} color={isLiked ? colors.spiceRed : 'rgba(255,255,255,0.9)'} fill={isLiked ? colors.spiceRed : 'transparent'} />
@@ -306,7 +313,7 @@ const ReelItem = ({ post, isActive, onComment, onSave, isScreenFocused, onEdit, 
     );
 
     const BottomPanel = () => (
-        <View style={[panelStyles.container, { bottom: insets.bottom + 60 }]}>
+        <View style={[panelStyles.container, { bottom: insets.bottom + -20 }]}>
             <BlurView intensity={40} tint="dark" style={panelStyles.glassPanel}>
                 <UserRow />
                 {!!post.caption && <CaptionRow />}
@@ -494,6 +501,8 @@ export const ReelsScreen = () => {
     const [focusCommentId, setFocusCommentId] = useState<string | null>(null);
     const flatListRef = useRef<FlatList>(null);
     const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
+    // Optimistic updates
+    const [optimisticLikes, setOptimisticLikes] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         const unsubscribe = subscribeToFeedPosts((fetchedPosts) => {
@@ -532,6 +541,38 @@ export const ReelsScreen = () => {
         }
     }).current;
 
+    const handleLike = async (postId: string, userId: string) => {
+        if (!userId) return;
+
+        // Optimistic update
+        const currentPost = posts.find(p => p.id === postId);
+        const currentLikeState = optimisticLikes[postId] !== undefined
+            ? optimisticLikes[postId]
+            : currentPost?.liked_by?.includes(userId);
+        const newLikeState = !currentLikeState;
+        setOptimisticLikes(prev => ({ ...prev, [postId]: newLikeState }));
+
+        try {
+            await togglePostLike(postId, userId);
+            // Clear optimistic state after successful update
+            setTimeout(() => {
+                setOptimisticLikes(prev => {
+                    const newState = { ...prev };
+                    delete newState[postId];
+                    return newState;
+                });
+            }, 500);
+        } catch (error) {
+            console.error('Error liking post:', error);
+            // Revert optimistic update on error
+            setOptimisticLikes(prev => {
+                const newState = { ...prev };
+                delete newState[postId];
+                return newState;
+            });
+        }
+    };
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
@@ -553,6 +594,8 @@ export const ReelsScreen = () => {
                                 archivePost(item.id);
                                 Alert.alert('Arşivlendi', 'Gönderi arşive taşındı.');
                             }}
+                            optimisticIsLiked={optimisticLikes[item.id]}
+                            onLike={() => handleLike(item.id, item.userId)}
                         />
                     )}
                     keyExtractor={(item) => item.id}
@@ -608,15 +651,20 @@ const topBarStyles = StyleSheet.create({
     iconBtn: {
         // Wrapper for hitSlop
     },
+    btnBorder: {
+        borderRadius: 100,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+        overflow: 'hidden',
+    },
     blurBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
+        width: 38,
+        height: 38,
+        backgroundColor: 'rgba(20,18,14,0.025)',
+        borderRadius: 100,
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.12)',
     },
 });
 
@@ -627,15 +675,13 @@ const panelStyles = StyleSheet.create({
         right: 12,
     },
     glassPanel: {
-        borderRadius: 24,
+        borderRadius: 38,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.10)',
-        paddingHorizontal: 14,
-        paddingTop: 12,
-        paddingBottom: 10,
+        padding: 16,
         gap: 8,
-        backgroundColor: 'rgba(20,18,14,0.55)',
+        backgroundColor: 'rgba(20,18,14,0.025)',
     },
 });
 

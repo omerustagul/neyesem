@@ -35,6 +35,7 @@ export const PublicProfileScreen = () => {
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isFollowing, setIsFollowing] = useState(false);
+    const [optimisticFollow, setOptimisticFollow] = useState<boolean | null>(null);
     const [followListType, setFollowListType] = useState<'followers' | 'following' | null>(null);
     const [activeStories, setActiveStories] = useState<Story[]>([]);
     const [viewerVisible, setViewerVisible] = useState(false);
@@ -100,7 +101,9 @@ export const PublicProfileScreen = () => {
             return;
         }
 
-        if (isFollowing) {
+        const currentFollowState = optimisticFollow !== null ? optimisticFollow : isFollowing;
+
+        if (currentFollowState) {
             Alert.alert(
                 'Takibi Bırak',
                 `@${profile?.username} kullanıcısını takibi bırakmak istediğine emin misin?`,
@@ -110,20 +113,26 @@ export const PublicProfileScreen = () => {
                         text: 'Takibi Bırak',
                         style: 'destructive',
                         onPress: async () => {
+                            setOptimisticFollow(false);
                             try {
                                 await unfollowUser(currentUser.uid, userId);
+                                setTimeout(() => setOptimisticFollow(null), 500);
                             } catch (error) {
                                 Alert.alert('Hata', 'İşlem gerçekleştirilemedi.');
+                                setOptimisticFollow(null);
                             }
                         }
                     }
                 ]
             );
         } else {
+            setOptimisticFollow(true);
             try {
                 await followUser(currentUser.uid, userId);
+                setTimeout(() => setOptimisticFollow(null), 500);
             } catch (error) {
                 Alert.alert('Hata', 'İşlem gerçekleştirilemedi.');
+                setOptimisticFollow(null);
             }
         }
     };
@@ -211,21 +220,21 @@ export const PublicProfileScreen = () => {
                                 style={[
                                     styles.followButton,
                                     {
-                                        backgroundColor: isFollowing ? colors.spiceRed : colors.saffron,
-                                        borderColor: isFollowing ? colors.spiceRed : colors.saffron,
+                                        backgroundColor: (optimisticFollow !== null ? optimisticFollow : isFollowing) ? colors.spiceRed : colors.saffron,
+                                        borderColor: (optimisticFollow !== null ? optimisticFollow : isFollowing) ? colors.spiceRed : colors.saffron,
                                         borderWidth: 1
                                     }
                                 ]}
                                 onPress={handleFollowToggle}
                             >
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    {isFollowing ? (
+                                    {(optimisticFollow !== null ? optimisticFollow : isFollowing) ? (
                                         <UserCheck size={18} color={colors.warmWhite} />
                                     ) : (
                                         <UserPlus size={18} color={colors.warmWhite} />
                                     )}
                                     <Text style={[styles.followButtonText, { color: colors.warmWhite, fontFamily: typography.bodyMedium }]}>
-                                        {isFollowing ? 'Takibi Bırak' : 'Takip Et'}
+                                        {(optimisticFollow !== null ? optimisticFollow : isFollowing) ? 'Takibi Bırak' : 'Takip Et'}
                                     </Text>
                                 </View>
                             </TouchableOpacity>

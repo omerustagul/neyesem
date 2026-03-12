@@ -169,6 +169,9 @@ export const FeedScreen = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [viewableItems, setViewableItems] = useState<string[]>([]);
     const [followingList, setFollowingList] = useState<string[]>([]);
+    // Optimistic updates
+    const [optimisticLikes, setOptimisticLikes] = useState<Record<string, boolean>>({});
+    const [optimisticFollows, setOptimisticFollows] = useState<Record<string, boolean>>({});
     // global refresh hook (defined for future use)
     const [activeStories, setActiveStories] = useState<Story[]>([]);
     const [viewerVisible, setViewerVisible] = useState(false);
@@ -254,12 +257,34 @@ export const FeedScreen = () => {
 
     const handleLike = async (postId: string) => {
         if (!user) return;
+        
+        // Optimistic update
+        const currentLikeState = optimisticLikes[postId] ?? posts.find(p => p.id === postId)?.liked_by?.includes(user.uid);
+        const newLikeState = !currentLikeState;
+        setOptimisticLikes(prev => ({ ...prev, [postId]: newLikeState }));
+        
         try {
             await togglePostLike(postId, user.uid);
             const { addXP } = useLevelStore.getState();
-            await addXP(user.uid, 2);
+            if (newLikeState) {
+                await addXP(user.uid, 2);
+            }
+            // Clear optimistic state after successful update
+            setTimeout(() => {
+                setOptimisticLikes(prev => {
+                    const newState = { ...prev };
+                    delete newState[postId];
+                    return newState;
+                });
+            }, 500);
         } catch (error) {
             console.error('Error liking post:', error);
+            // Revert optimistic update on error
+            setOptimisticLikes(prev => {
+                const newState = { ...prev };
+                delete newState[postId];
+                return newState;
+            });
         }
     };
 
@@ -275,23 +300,45 @@ export const FeedScreen = () => {
     };
 
     const renderItem = ({ item }: { item: Post }) => {
-        const isLiked = item.liked_by?.includes(user?.uid || '');
+        // Check optimistic state first, then fall back to actual data
+        const actualIsLiked = item.liked_by?.includes(user?.uid || '');
+        const isLiked = optimisticLikes[item.id] !== undefined ? optimisticLikes[item.id] : actualIsLiked;
+        
         const isVisible = viewableItems.includes(item.id);
-        const isFollowing = followingList.includes(item.userId);
+        const actualIsFollowing = followingList.includes(item.userId);
+        const isFollowing = optimisticFollows[item.userId] !== undefined ? optimisticFollows[item.userId] : actualIsFollowing;
+        
         const hasActiveStory = activeStories.some(s => s.userId === item.userId);
 
         const handleToggleFollow = async () => {
             if (!user) return;
+            
+            // Optimistic update
+            const newFollowState = !isFollowing;
+            setOptimisticFollows(prev => ({ ...prev, [item.userId]: newFollowState }));
+            
             try {
                 if (isFollowing) {
                     await unfollowUser(user.uid, item.userId);
-                    setFollowingList(prev => prev.filter(id => id !== item.userId));
                 } else {
                     await followUser(user.uid, item.userId);
-                    setFollowingList(prev => [...prev, item.userId]);
                 }
+                // Clear optimistic state after successful update
+                setTimeout(() => {
+                    setOptimisticFollows(prev => {
+                        const newState = { ...prev };
+                        delete newState[item.userId];
+                        return newState;
+                    });
+                }, 500);
             } catch (error) {
                 console.error('Error toggling follow:', error);
+                // Revert optimistic update on error
+                setOptimisticFollows(prev => {
+                    const newState = { ...prev };
+                    delete newState[item.userId];
+                    return newState;
+                });
             }
         };
 

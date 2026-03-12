@@ -1,4 +1,4 @@
-import BottomSheet, { BottomSheetBackdrop, BottomSheetFlatList, BottomSheetFooter, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetFlatList, BottomSheetFooter } from '@gorhom/bottom-sheet';
 import { formatDistanceToNow } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { BlurView } from 'expo-blur';
@@ -6,7 +6,8 @@ import { Image as ExpoImage } from 'expo-image';
 import { Edit2, Heart, Trash2, X } from 'lucide-react-native';
 import { AnimatePresence, MotiView } from 'moti';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Dimensions, Keyboard, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Keyboard, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { TextInput } from 'react-native-gesture-handler';
 import { Portal } from 'react-native-paper';
 import { Comment, addComment, deleteComment, subscribeToComments, toggleCommentLike, updateComment } from '../../api/commentService';
 import { useUserProfile } from '../../hooks/useUserProfile';
@@ -159,9 +160,8 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose, f
     const bottomSheetRef = useRef<BottomSheet>(null);
     const flatListRef = useRef<any>(null);
     const inputRef = useRef<any>(null);
-    const { height: SCREEN_HEIGHT } = Dimensions.get('window');
     // Daha Instagram tarzı bir hissiyat için ekran boyutuna oranlı modal yüksekliği
-    const snapPoints = useMemo(() => [Math.max(250, SCREEN_HEIGHT * 0.65), '100%'], [SCREEN_HEIGHT]);
+    const snapPoints = useMemo(() => ['70%', '90%'], []);
 
     const [comments, setComments] = useState<Comment[]>([]);
     const [inputText, setInputText] = useState('');
@@ -249,7 +249,10 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose, f
     const handleEdit = (comment: Comment) => {
         setInputText(comment.text);
         setEditingCommentId(comment.id);
-        inputRef.current?.focus();
+        // Delay focus to ensure keyboard opens properly
+        setTimeout(() => {
+            inputRef.current?.focus();
+        }, 100);
     };
 
     const handleCancelEdit = () => {
@@ -304,14 +307,9 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose, f
 
     const renderFooter = useCallback(
         (props: any) => (
-            <BottomSheetFooter {...props} bottomInset={10}>
-                {/* Emojis bar & Fixed input area */}
-                <MotiView
-                    from={{ opacity: 0, translateY: 20 }}
-                    animate={{ opacity: 1, translateY: 0 }}
-                    style={styles.floatingFooter}
-                >
-                    <BlurView intensity={isDark ? 40 : 60} tint={isDark ? 'dark' : 'light'} style={styles.footerBlur}>
+            <BottomSheetFooter {...props} bottomInset={0}>
+                <View style={styles.footerContainer}>
+                    <BlurView intensity={isDark ? 40 : 60} tint={isDark ? 'dark' : 'light'} style={styles.inputBlur}>
                         {/* Quick Emojis */}
                         {!isKeyboardVisible && (
                             <View style={styles.emojiListRow}>
@@ -323,7 +321,7 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose, f
                             </View>
                         )}
 
-                        <View style={styles.inputContainer}>
+                        <View style={styles.inputContainer} onStartShouldSetResponder={() => true}>
                             {currentUserProfile?.avatar_url || user?.photoURL ? (
                                 <ExpoImage source={{ uri: currentUserProfile?.avatar_url || user?.photoURL || '' }} style={styles.inputAvatar} />
                             ) : (
@@ -333,12 +331,12 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose, f
                                     </Text>
                                 </View>
                             )}
-                            <View style={styles.inputWrapper}>
-                                <BottomSheetTextInput
+                            <View style={styles.inputWrapper} onStartShouldSetResponder={() => true} pointerEvents="box-none">
+                                <TextInput
                                     ref={inputRef}
                                     style={[styles.input, {
                                         color: theme.text,
-                                        fontFamily: typography.body
+                                        fontFamily: typography.body,
                                     }]}
                                     placeholder={editingCommentId ? "Yorumu düzenle..." : "Düşüncelerini paylaş..."}
                                     placeholderTextColor={theme.secondaryText}
@@ -346,6 +344,10 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose, f
                                     onChangeText={setInputText}
                                     multiline
                                     maxLength={500}
+                                    returnKeyType="default"
+                                    blurOnSubmit={false}
+                                    editable={true}
+                                    selectTextOnFocus={true}
                                 />
                                 {inputText.trim().length > 0 && (
                                     <TouchableOpacity onPress={handleSend} style={styles.sendButtonCircle}>
@@ -357,7 +359,7 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose, f
                             </View>
                         </View>
                     </BlurView>
-                </MotiView>
+                </View>
             </BottomSheetFooter>
         ),
         [isDark, theme, typography, user, inputText, editingCommentId, currentUserProfile, isKeyboardVisible]
@@ -373,7 +375,7 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose, f
                 footerComponent={renderFooter}
                 backgroundComponent={renderBackground}
                 enablePanDownToClose
-                keyboardBehavior="interactive"
+                keyboardBehavior="extend"
                 keyboardBlurBehavior="restore"
                 onClose={onClose}
                 backgroundStyle={{
@@ -381,6 +383,11 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose, f
                 }}
                 handleIndicatorStyle={{ backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)', width: 40 }}
                 android_keyboardInputMode="adjustResize"
+                enableDynamicSizing={false}
+                enableHandlePanningGesture={true}
+                enableContentPanningGesture={true}
+                enableOverDrag={false}
+                activeOffsetY={[-10, 10]}
             >
                 {/* Header */}
                 <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)' }]}>
@@ -398,7 +405,7 @@ export const CommentsPopup: React.FC<CommentsPopupProps> = ({ postId, onClose, f
                     data={comments}
                     keyExtractor={(item: Comment) => item.id}
                     renderItem={renderItem}
-                    contentContainerStyle={[styles.listContent, { paddingBottom: 100 }]} // Extra padding for footer and keyboard
+                    contentContainerStyle={[styles.listContent, { paddingBottom: 20 }]}
                     keyboardShouldPersistTaps="handled"
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
@@ -465,7 +472,7 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingTop: 8,
-        paddingBottom: 120, // Space for floating footer
+        paddingBottom: 20,
     },
     commentItem: {
         flexDirection: 'row',
@@ -534,27 +541,6 @@ const styles = StyleSheet.create({
         marginTop: 4,
         opacity: 0.6,
     },
-    floatingFooter: {
-        marginHorizontal: 16,
-        marginBottom: 10,
-        borderRadius: 28,
-        overflow: 'hidden',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.1,
-                shadowRadius: 12,
-            },
-            android: {
-                elevation: 4,
-            },
-        }),
-    },
-    footerBlur: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-    },
     emojiListRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -603,6 +589,7 @@ const styles = StyleSheet.create({
         paddingTop: 10,
         paddingBottom: 10,
         fontSize: 14,
+        textAlignVertical: 'center',
     },
     sendButtonCircle: {
         width: 32,
@@ -628,5 +615,29 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         overflow: 'hidden',
         gap: 8,
+    },
+    footerContainer: {
+        paddingHorizontal: 12,
+        paddingBottom: Platform.OS === 'ios' ? 8 : 12,
+    },
+    inputBlur: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+        borderRadius: 38,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(240, 240, 240, 0.1)',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 8,
+            },
+        }),
     },
 });

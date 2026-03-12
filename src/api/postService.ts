@@ -25,13 +25,20 @@ export interface Post {
     created_at: any;
     updated_at: any;
     cooking_time?: string;
+    prep_time?: string;
     difficulty?: string;
+    servings?: string;
     calories?: number;
     protein?: string;
+    carbs?: string;
+    fat?: string;
+    fiber?: string;
     thumbnail_url?: string;
     tags?: string[];
     ingredients?: string[];
     recipe_steps?: string[];
+    allergens?: string[];
+    tips?: string[];
     chainId?: string;
     parentPostId?: string;
     isChainRoot?: boolean;
@@ -49,12 +56,19 @@ export const createPost = async (
     content_type: 'text' | 'image' | 'video' | 'embed',
     content_url?: string,
     cooking_time?: string,
+    prep_time?: string,
     difficulty?: string,
+    servings?: string,
     calories?: number,
     protein?: string,
+    carbs?: string,
+    fat?: string,
+    fiber?: string,
     thumbnail_url?: string,
     tags: string[] = [],
     ingredients: string[] = [],
+    allergens: string[] = [],
+    tips: string[] = [],
     chainId?: string,
     parentPostId?: string,
     isChainRoot?: boolean,
@@ -72,12 +86,19 @@ export const createPost = async (
             content_type,
             content_url: content_url || null,
             cooking_time: cooking_time || '',
+            prep_time: prep_time || '',
             difficulty: difficulty || '',
+            servings: servings || '',
             calories: calories || 0,
             protein: protein || '',
+            carbs: carbs || '',
+            fat: fat || '',
+            fiber: fiber || '',
             thumbnail_url: thumbnail_url || '',
             tags,
             ingredients,
+            allergens,
+            tips,
             chainId: chainId || null,
             parentPostId: parentPostId || null,
             isChainRoot: isChainRoot || false,

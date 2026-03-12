@@ -1,7 +1,6 @@
 # 🎬 ReelsScreen — Vizyoner Yeniden Tasarım
 ## Neyesem Uygulaması · Cursor/Windsurf Implementasyon Rehberi
 
-> **Bu döküman bir AI kod editörü için hazırlanmıştır.**
 > Mevcut `ReelsScreen.tsx` dosyası tamamen yeniden yazılacak.
 > Tüm mevcut mantık (video oynatma, like, yorum, kaydet, arşiv, silme) korunacak —
 > sadece layout, görsel hiyerarşi ve etkileşim katmanı yenileniyor.

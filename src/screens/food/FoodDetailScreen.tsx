@@ -3,7 +3,7 @@ import { BlurView } from 'expo-blur';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { ArrowLeft, ChefHat, Clock, Flame, Gauge, Play, Utensils } from 'lucide-react-native';
+import { ArrowLeft, ChefHat, Clock, Gauge, Play, Utensils } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
     Dimensions,
@@ -117,9 +117,11 @@ export const FoodDetailScreen = () => {
         return () => unsubscribe();
     }, [post.id]);
 
-    const hasNutrition = !!(post.cooking_time || post.difficulty || post.calories || post.protein);
+    const hasNutrition = !!(post.cooking_time || post.prep_time || post.servings || post.difficulty || post.calories || post.protein || post.carbs || post.fat || post.fiber);
     const hasIngredients = !!(post.ingredients && post.ingredients.length > 0);
     const hasRecipeSteps = !!(post.recipe_steps && post.recipe_steps.length > 0);
+    const hasAllergens = !!(post.allergens && post.allergens.length > 0);
+    const hasTips = !!(post.tips && post.tips.length > 0);
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -167,23 +169,74 @@ export const FoodDetailScreen = () => {
                         <View style={styles.sectionTitleRow}>
                             <ChefHat size={16} color={colors.saffron} />
                             <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
-                                Besin Değerleri
+                                Tarif Bilgileri
                             </Text>
                         </View>
                         <View style={styles.nutritionGrid}>
+                            {!!post.prep_time && (
+                                <NutritionCard icon={Clock} label="Hazırlık" value={post.prep_time} color={colors.mintFresh} />
+                            )}
                             {!!post.cooking_time && (
-                                <NutritionCard icon={Clock} label="Süre" value={post.cooking_time} color={colors.saffron} />
+                                <NutritionCard icon={Zap} label="Pişirme" value={post.cooking_time} color={colors.saffron} />
+                            )}
+                            {!!post.servings && (
+                                <NutritionCard icon={Utensils} label="Porsiyon" value={post.servings} color={colors.oliveLight} />
                             )}
                             {!!post.difficulty && (
                                 <NutritionCard icon={Gauge} label="Zorluk" value={post.difficulty} color={colors.mintFresh} />
                             )}
-                            {!!post.calories && (
-                                <NutritionCard icon={Flame} label="Kalori" value={`${post.calories} kcal`} color={colors.spiceRed} />
-                            )}
-                            {!!post.protein && (
-                                <NutritionCard icon={ChefHat} label="Protein" value={post.protein} color={colors.oliveLight} />
-                            )}
                         </View>
+
+                        {/* Nutrition Values */}
+                        {(post.calories || post.protein || post.carbs || post.fat || post.fiber) && (
+                            <View style={[styles.nutritionValuesContainer, { borderTopColor: theme.border }]}>
+                                <Text style={[styles.nutritionValuesTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                    Besin Değerleri (100g başına)
+                                </Text>
+                                <View style={styles.nutritionValuesGrid}>
+                                    {!!post.calories && (
+                                        <View style={styles.nutritionValue}>
+                                            <Text style={[styles.nutritionValueLabel, { color: theme.secondaryText }]}>Kalori</Text>
+                                            <Text style={[styles.nutritionValueText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                                {post.calories} kcal
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {!!post.protein && (
+                                        <View style={styles.nutritionValue}>
+                                            <Text style={[styles.nutritionValueLabel, { color: theme.secondaryText }]}>Protein</Text>
+                                            <Text style={[styles.nutritionValueText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                                {post.protein}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {!!post.carbs && (
+                                        <View style={styles.nutritionValue}>
+                                            <Text style={[styles.nutritionValueLabel, { color: theme.secondaryText }]}>Karbohidrat</Text>
+                                            <Text style={[styles.nutritionValueText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                                {post.carbs}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {!!post.fat && (
+                                        <View style={styles.nutritionValue}>
+                                            <Text style={[styles.nutritionValueLabel, { color: theme.secondaryText }]}>Yağ</Text>
+                                            <Text style={[styles.nutritionValueText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                                {post.fat}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {!!post.fiber && (
+                                        <View style={styles.nutritionValue}>
+                                            <Text style={[styles.nutritionValueLabel, { color: theme.secondaryText }]}>Lif</Text>
+                                            <Text style={[styles.nutritionValueText, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                                {post.fiber}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        )}
                     </View>
                 )}
 
@@ -235,8 +288,54 @@ export const FoodDetailScreen = () => {
                     </View>
                 )}
 
+                {/* Tips */}
+                {hasTips && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionTitleRow}>
+                            <Leaf size={16} color={colors.oliveLight} />
+                            <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                İpuçları
+                            </Text>
+                        </View>
+                        {post.tips!.map((tip, i) => (
+                            <View key={i} style={[styles.tipRow, { backgroundColor: isDark ? 'rgba(255,178,0,0.08)' : 'rgba(255,178,0,0.05)', borderColor: isDark ? 'rgba(255,178,0,0.15)' : 'rgba(255,178,0,0.1)' }]}>
+                                <Text style={[styles.tipText, { color: theme.text, fontFamily: typography.body }]}>
+                                    {tip}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* Allergens */}
+                {hasAllergens && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionTitleRow}>
+                            <AlertCircle size={16} color={colors.spiceRed} />
+                            <Text style={[styles.sectionTitle, { color: theme.text, fontFamily: typography.bodyMedium }]}>
+                                Alerjen Uyarısı
+                            </Text>
+                        </View>
+                        <View style={styles.allergenGrid}>
+                            {post.allergens!.map((allergen, i) => (
+                                <BlurView
+                                    key={i}
+                                    intensity={isDark ? 20 : 10}
+                                    tint={isDark ? 'dark' : 'light'}
+                                    style={[styles.allergenChip, { borderColor: colors.spiceRed + '40' }]}
+                                >
+                                    <AlertCircle size={12} color={colors.spiceRed} />
+                                    <Text style={[styles.allergenText, { color: colors.spiceRed, fontFamily: typography.body }]}>
+                                        {allergen}
+                                    </Text>
+                                </BlurView>
+                            ))}
+                        </View>
+                    </View>
+                )}
+
                 {/* Empty state when no recipe data */}
-                {!hasIngredients && !hasRecipeSteps && (
+                {!hasIngredients && !hasRecipeSteps && !hasAllergens && !hasTips && (
                     <View style={[styles.emptyCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderColor: theme.border }]}>
                         <ChefHat size={36} color={theme.secondaryText} />
                         <Text style={[styles.emptyText, { color: theme.secondaryText, fontFamily: typography.body }]}>
@@ -382,6 +481,60 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 14,
         lineHeight: 21,
+    },
+    tipRow: {
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginBottom: 8,
+    },
+    tipText: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    allergenGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    allergenChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        overflow: 'hidden',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    allergenText: {
+        fontSize: 12,
+    },
+    nutritionValuesContainer: {
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 0.5,
+    },
+    nutritionValuesTitle: {
+        fontSize: 14,
+        marginBottom: 12,
+    },
+    nutritionValuesGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    nutritionValue: {
+        flex: 1,
+        minWidth: '45%',
+        alignItems: 'center',
+    },
+    nutritionValueLabel: {
+        fontSize: 11,
+        marginBottom: 4,
+    },
+    nutritionValueText: {
+        fontSize: 13,
     },
     emptyCard: {
         margin: 16,
